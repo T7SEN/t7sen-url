@@ -44,17 +44,11 @@ export const profileData: ProfileConfig = {
 
   links: [
     {
-      id: "portfolio",
-      title: "Portfolio & Projects",
-      url: "https://github.com/t7sen/portfolio",
-      icon: Icons.code,
-      isFeatured: true,
-    },
-    {
       id: "website",
-      title: "Personal Website",
+      title: "My Site",
       url: "https://t7sen.com",
       icon: Icons.globe,
+      isFeatured: true,
     },
   ],
 
