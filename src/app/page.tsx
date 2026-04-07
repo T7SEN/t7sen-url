@@ -10,6 +10,7 @@ import { profileData } from "@/config/profile";
 import posthog from "posthog-js";
 import { CopyEmailButton } from "@/components/copy-email-button";
 import { SupportCard } from "@/components/support-card";
+import { motion } from "motion/react";
 
 export default function Home() {
   const userInitials = profileData.name.slice(0, 2).toUpperCase();
@@ -17,21 +18,27 @@ export default function Home() {
 
   return (
     <SpotlightBackground>
-      {/* h-[100dvh] and overflow-hidden completely disable page scrolling.
-				We use relative positioning so the absolute toggle and footer anchor perfectly.
-			*/}
       <main className="relative flex h-[100dvh] w-full flex-col items-center justify-center overflow-hidden px-4 sm:px-6 font-sans">
         {/* Pinned to top right */}
         <div className="absolute right-4 top-4 z-50">
           <ThemeToggle />
         </div>
 
-        {/* Glassmorphic Container 
-					max-h-[85dvh] ensures it never hits the absolute top/bottom UI.
-					Scrollbar hiding classes are applied just in case of extreme landscape screens.
-				*/}
+        {/* Glassmorphic Container Wrapper */}
         <div className="flex w-full max-w-lg flex-col gap-4 z-10">
-          <div className="flex w-full max-w-lg max-h-[85dvh] flex-col items-center gap-6 overflow-y-auto rounded-3xl border border-zinc-200/50 bg-white/40 p-6 shadow-2xl backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-950/40 sm:p-8 animate-in fade-in zoom-in-95 duration-700 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
+          {/* Physics-Based Entrance Container */}
+          <motion.div
+            initial={{ opacity: 0, scale: 0.9, y: 40 }}
+            animate={{ opacity: 1, scale: 1, y: 0 }}
+            transition={{
+              type: "spring",
+              stiffness: 100,
+              damping: 18,
+              mass: 1.2,
+              delay: 0.3,
+            }}
+            className="flex w-full max-w-lg max-h-[85dvh] flex-col items-center gap-6 overflow-y-auto rounded-3xl border border-zinc-200/50 bg-white/40 p-6 shadow-2xl backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-950/40 sm:p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]"
+          >
             {/* Header / Profile Section */}
             <header className="flex flex-col items-center gap-4 text-center">
               <Avatar className="h-24 w-24 border-4 border-white shadow-xl dark:border-zinc-900 animate-in fade-in slide-in-from-bottom-4 duration-700 delay-150 fill-mode-backwards">
@@ -55,7 +62,7 @@ export default function Home() {
               </div>
             </header>
 
-            {/* 🔴 High-Fidelity Twitch Card 🔴 */}
+            {/* 🎮 High-Fidelity Twitch Card 🎮 */}
             <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-700 delay-500 fill-mode-backwards">
               <TwitchCard />
             </div>
@@ -72,7 +79,6 @@ export default function Home() {
                     key={link.id}
                     variant="outline"
                     size="lg"
-                    // Dynamic Featured Class Logic
                     className={`group relative w-full h-14 overflow-hidden rounded-2xl border-zinc-200/80 bg-white/60 text-sm sm:text-base font-semibold transition-all hover:scale-[1.02] hover:bg-white hover:shadow-md active:scale-[0.98] dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 ${
                       link.isFeatured
                         ? "border-[#9146FF]/30 dark:border-[#9146FF]/30 shadow-[#9146FF]/5"
@@ -84,7 +90,6 @@ export default function Home() {
                       href={link.url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      // Your exact existing PostHog code
                       onClick={() =>
                         posthog.capture("link_clicked", {
                           link_id: link.id,
@@ -98,7 +103,6 @@ export default function Home() {
                         <div className="absolute inset-0 -z-10 animate-pulse bg-gradient-to-r from-[#9146FF]/10 via-transparent to-[#9146FF]/10 opacity-50 dark:from-[#9146FF]/20 dark:to-[#9146FF]/20" />
                       )}
 
-                      {/* Dynamic Text Color for the Icon */}
                       <div
                         className={`absolute left-6 top-1/2 -translate-y-1/2 transition-colors ${link.isFeatured ? "text-[#9146FF] dark:text-[#9146FF]" : "text-zinc-400 group-hover:text-zinc-900 dark:group-hover:text-zinc-50"}`}
                       >
@@ -125,7 +129,6 @@ export default function Home() {
               {profileData.socials.map((social) => {
                 const Icon = social.icon;
 
-                // 🔴 INTERCEPT THE EMAIL LINK HERE 🔴
                 if (social.id === "email") {
                   return (
                     <CopyEmailButton
@@ -150,7 +153,6 @@ export default function Home() {
                       target="_blank"
                       rel="noopener noreferrer"
                       title={social.title}
-                      // Your exact existing PostHog code
                       onClick={() =>
                         posthog.capture("social_link_clicked", {
                           social_id: social.id,
@@ -169,19 +171,20 @@ export default function Home() {
                 );
               })}
             </nav>
-          </div>
+          </motion.div>
+
+          {/* Support Card */}
           <div className="w-full shrink-0 animate-in fade-in slide-in-from-bottom-8 duration-700 delay-[1000ms] fill-mode-backwards shadow-xl rounded-2xl backdrop-blur-xl">
             <SupportCard />
           </div>
         </div>
 
-        {/* Footer Pinned to Bottom */}
         <footer className="absolute bottom-4 z-10 flex items-center gap-1 text-xs font-medium text-zinc-500 dark:text-zinc-500 animate-in fade-in duration-700 delay-1000 fill-mode-backwards">
           <span>© {currentYear}</span>
           <span>•</span>
           <span>Made by T7SEN with</span>
           <span className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
-            💜
+            ❤️
           </span>
         </footer>
       </main>
