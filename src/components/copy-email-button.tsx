@@ -42,7 +42,7 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
   return (
     <button
       onClick={handleCopy}
-      className="cursor-pointer group relative flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-full border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50"
+      className="cursor-pointer group relative flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50"
       title={copied ? "Email Copied!" : title}
       aria-label={title}
     >
