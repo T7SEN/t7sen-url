@@ -5,6 +5,7 @@ import * as React from "react";
 import { motion, AnimatePresence } from "motion/react";
 import { Icons } from "@/components/icons";
 import { usePostHog } from "posthog-js/react";
+import { cn } from "@/lib/utils";
 
 interface CopyEmailButtonProps {
   id: string;
@@ -32,7 +33,9 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
         });
       }
 
-      setTimeout(() => setCopied(false), 2000);
+      setTimeout(() => {
+        setCopied(false);
+      }, 2000);
     } catch (err) {
       console.error("Failed to copy text", err);
     }
@@ -41,8 +44,14 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
   return (
     <button
       onClick={handleCopy}
-      // ✨ Added custom focus-visible ring classes here
-      className="group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50 dark:focus-visible:ring-offset-zinc-950 sm:h-12 sm:w-12"
+      className={cn(
+        "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-transparent bg-transparent transition-all hover:scale-110 sm:h-12 sm:w-12",
+        "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
+        // Light Theme
+        "text-zinc-500 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm",
+        // Dark Theme
+        "dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50",
+      )}
       title={copied ? "Email Copied!" : title}
       aria-label={title}
     >
@@ -59,7 +68,7 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
               stiffness: 200,
               damping: 10,
             }}
-            className="text-emerald-500"
+            className="text-emerald-500 dark:text-emerald-400"
           >
             <svg
               width="18"
