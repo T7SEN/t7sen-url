@@ -13,10 +13,13 @@ import { Icons } from "@/components/icons";
 import { profileData } from "@/config/profile";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
+import useSWR from "swr";
+
+
+const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function TwitchCard() {
   const posthog = usePostHog();
-  const [isLive, setIsLive] = React.useState<boolean | null>(null);
   const channel = profileData.twitchChannel;
 
   const mouseX = useMotionValue(0);
@@ -31,22 +34,20 @@ export function TwitchCard() {
     [mouseX, mouseY],
   );
 
-  React.useEffect(() => {
-    const checkStatus = async () => {
-      try {
-        const res = await fetch(`/api/twitch?channel=${channel}`);
-        const data = await res.json();
-        setIsLive(data.isLive === true);
-      } catch (err) {
-        console.error("Failed to fetch Twitch status:", err);
-        setIsLive(false);
-      }
-    };
+  // SWR Integration: Replaces useEffect, useState, and setInterval
+  const { data, error } = useSWR(`/api/twitch?channel=${channel}`, fetcher, {
+    refreshInterval: 60000, // Poll every 60 seconds automatically
+    revalidateOnFocus: true, // Instantly refresh when the user returns to the tab
+    shouldRetryOnError: false, // Don't aggressively retry if the API is truly down
+  });
 
-    checkStatus();
-    const interval = setInterval(checkStatus, 60000);
-    return () => clearInterval(interval);
-  }, [channel]);
+  // Derive the live status explicitly based on SWR's reactive states
+  let isLive: boolean | null = null;
+  if (error) {
+    isLive = false;
+  } else if (data !== undefined) {
+    isLive = data.isLive === true;
+  }
 
   const glareBackground = useMotionTemplate`
 		radial-gradient(
