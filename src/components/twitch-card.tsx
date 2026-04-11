@@ -18,8 +18,6 @@ export function TwitchCard() {
   const [isLive, setIsLive] = React.useState<boolean | null>(null);
   const channel = profileData.twitchChannel;
 
-  // --- 1. ALL HOOKS DECLARED AT THE TOP LEVEL ---
-
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
@@ -47,7 +45,6 @@ export function TwitchCard() {
     return () => clearInterval(interval);
   }, [channel]);
 
-  // The Interactive Glass Glare Hook
   const glareBackground = useMotionTemplate`
 		radial-gradient(
 			350px circle at ${mouseX}px ${mouseY}px,
@@ -65,15 +62,11 @@ export function TwitchCard() {
     }
   };
 
-  // --- 2. SKELETON LOADER (Matches Original Big Layout) ---
   if (isLive === null) {
     return (
       <div className="w-full animate-pulse">
         <div className="group relative block w-full overflow-hidden rounded-3xl border border-zinc-800/50 bg-[#030303] shadow-xl">
-          {/* Tall Skeleton Banner */}
           <div className="h-32 w-full bg-zinc-900" />
-
-          {/* Skeleton Body */}
           <div className="relative -mt-5 flex flex-col items-center px-6 pb-6 text-center">
             <div className="mb-4 h-7 w-24 rounded-full bg-zinc-800" />
             <div className="flex w-full items-center justify-between gap-4">
@@ -92,7 +85,6 @@ export function TwitchCard() {
     );
   }
 
-  // --- 3. THE MAIN RENDER (HERO VANGUARD) ---
   return (
     <motion.div
       initial={{ opacity: 0, y: 15 }}
@@ -106,13 +98,13 @@ export function TwitchCard() {
         rel="noopener noreferrer"
         onMouseMove={handleMouseMove}
         onClick={handleClick}
-        className={`group relative block w-full overflow-hidden rounded-3xl border transition-all duration-500 hover:scale-[1.02] ${
+        // ✨ Injected the focus-visible ring classes right here ✨
+        className={`group relative block w-full overflow-hidden rounded-3xl border transition-all duration-500 hover:scale-[1.02] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950 ${
           isLive
             ? "border-[#9146FF]/40 shadow-[0_0_40px_-10px_rgba(145,70,255,0.3)] hover:border-[#9146FF] hover:shadow-[0_0_60px_-10px_rgba(145,70,255,0.5)]"
             : "border-zinc-800/50 shadow-xl hover:border-zinc-700 hover:shadow-2xl"
         } bg-[#030303]`}
       >
-        {/* 1. Tall Banner Area (Original Height Restored & Increased Slightly) */}
         <div className="relative h-32 w-full overflow-hidden bg-zinc-950">
           <Image
             src={profileData.bannerUrl}
@@ -125,19 +117,15 @@ export function TwitchCard() {
             }`}
             priority
           />
-          {/* Dark fade up into the banner */}
           <div className="absolute inset-0 bg-linear-to-t from-[#030303] via-transparent to-transparent" />
         </div>
 
-        {/* 2. Interactive Glass Glare (Tracks Cursor) */}
         <motion.div
           className="pointer-events-none absolute inset-0 z-10 opacity-0 mix-blend-overlay transition-opacity duration-500 group-hover:opacity-100"
           style={{ background: glareBackground }}
         />
 
-        {/* 3. The Content Body (Original Stacked Layout) */}
         <div className="relative z-20 -mt-5 flex flex-col items-center px-6 pb-6 text-center">
-          {/* Overlapping Status Badge */}
           <div className="mb-5 h-7">
             <AnimatePresence mode="wait">
               {isLive ? (
@@ -169,7 +157,6 @@ export function TwitchCard() {
             </AnimatePresence>
           </div>
 
-          {/* Channel Info Row */}
           <div className="flex w-full items-center justify-between gap-4">
             <div className="flex items-center gap-4">
               <div
@@ -192,7 +179,6 @@ export function TwitchCard() {
               </div>
             </div>
 
-            {/* Action Arrow */}
             <div
               className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-full border backdrop-blur-md transition-all duration-300 group-hover:-rotate-45 ${
                 isLive

@@ -31,8 +31,7 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleClick}
-        // 🚀 FIX: Reduced vertical padding (py-5), sleeker rounded corners
-        className="group relative flex w-full items-center justify-center overflow-hidden rounded-[20px] bg-[#030303] px-6 py-5 shadow-xl transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_0_50px_-15px_rgba(145,70,255,0.5)]"
+        className="group relative flex w-full items-center justify-center overflow-hidden rounded-[20px] bg-[#030303] px-6 py-5 shadow-xl transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_0_50px_-15px_rgba(145,70,255,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950"
       >
         {/* 1. The Infinite Void (Cosmic Noise Background) */}
         <div
@@ -48,20 +47,12 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
         <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-cyan-900/20 via-transparent to-transparent transition-opacity duration-500 group-hover:opacity-0" />
 
         {/* --- THE HOLLOW PURPLE SEQUENCE --- */}
-
-        {/* Cursed Technique Lapse: Blue */}
         <div className="absolute -left-[50%] top-1/2 z-0 h-40 w-40 -translate-y-1/2 rounded-full bg-blue-600 blur-2xl transition-all duration-600 ease-in group-hover:left-1/2 group-hover:-translate-x-1/2 group-hover:opacity-0" />
-
-        {/* Cursed Technique Reversal: Red */}
         <div className="absolute -right-[50%] top-1/2 z-0 h-40 w-40 -translate-y-1/2 rounded-full bg-red-600 blur-2xl transition-all duration-600 ease-in group-hover:right-1/2 group-hover:translate-x-1/2 group-hover:opacity-0" />
-
-        {/* Hollow Technique: Purple (The Explosion) */}
         <div className="absolute left-1/2 top-1/2 z-0 h-48 w-48 -translate-x-1/2 -translate-y-1/2 scale-0 rounded-full bg-[#9146FF] opacity-0 blur-[50px] transition-all duration-700 ease-out group-hover:scale-[3] group-hover:opacity-100 group-hover:delay-[400ms]" />
 
         {/* --- FOREGROUND ELEMENTS --- */}
-        {/* 🚀 FIX: Changed to flex-row for horizontal layout, reduced gap */}
         <div className="relative z-10 flex flex-row items-center gap-5 text-center">
-          {/* Floating Infinity Orb (Scaled down slightly) */}
           <motion.div
             animate={{ y: [0, -4, 0] }}
             transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
@@ -70,7 +61,6 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
             <Icon className="h-5 w-5 text-cyan-300 transition-colors duration-700 group-hover:text-white group-hover:delay-[400ms]" />
           </motion.div>
 
-          {/* Title Text (Slightly smaller to fit the sleek profile) */}
           <span className="bg-linear-to-b from-zinc-100 to-zinc-500 bg-clip-text text-2xl font-black tracking-[0.15em] text-transparent transition-all duration-700 group-hover:from-white group-hover:to-purple-100 group-hover:delay-[400ms]">
             {title}
           </span>
@@ -82,14 +72,14 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
     );
   }
 
-  // Standard non-featured layout remains intact
+  // Standard non-featured layout with strict a11y focus states
   return (
     <a
       href={url}
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
-      className="flex w-full items-center gap-3 rounded-xl border border-zinc-200/50 bg-white/40 p-4 transition-all hover:scale-[1.02] hover:border-zinc-300 hover:bg-white hover:shadow-sm dark:border-zinc-800/50 dark:bg-zinc-950/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+      className="flex w-full items-center gap-3 rounded-xl border border-zinc-200/50 bg-white/40 p-4 transition-all hover:scale-[1.02] hover:border-zinc-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-zinc-800/50 dark:bg-zinc-950/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:focus-visible:ring-offset-zinc-950"
     >
       <Icon className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
       <span className="font-medium text-zinc-800 dark:text-zinc-200">
