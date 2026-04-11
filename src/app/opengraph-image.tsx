@@ -7,7 +7,11 @@ export const alt = `${profileData.name} - ${profileData.bio}`;
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
+// Edge runtimes prefer dynamic evaluation for OG images relying on environment variables
+export const dynamic = "force-dynamic";
+
 export default async function Image() {
+  // Construct the absolute URL safely for the Next.js Edge runtime
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
   const safeAvatarPath = profileData.avatarUrl.replace(".webp", ".png");
   const avatarSrc = new URL(safeAvatarPath, appUrl).href;
@@ -15,7 +19,7 @@ export default async function Image() {
   return new ImageResponse(
     <div
       style={{
-        background: "linear-gradient(to bottom right, #09090b, #18181b)",
+        background: "#030303",
         width: "100%",
         height: "100%",
         display: "flex",
@@ -24,9 +28,10 @@ export default async function Image() {
         justifyContent: "center",
         fontFamily: "sans-serif",
         position: "relative",
+        overflow: "hidden",
       }}
     >
-      {/* Subtle Twitch Purple Glow */}
+      {/* The "Hollow Purple" Aesthetic Background Glows */}
       <div
         style={{
           position: "absolute",
@@ -35,7 +40,18 @@ export default async function Image() {
           width: "80%",
           height: "80%",
           background:
-            "radial-gradient(circle, rgba(145,70,255,0.15) 0%, rgba(0,0,0,0) 70%)",
+            "radial-gradient(circle, rgba(6,182,212,0.15) 0%, rgba(0,0,0,0) 60%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: "-20%",
+          right: "-10%",
+          width: "80%",
+          height: "80%",
+          background:
+            "radial-gradient(circle, rgba(145,70,255,0.2) 0%, rgba(0,0,0,0) 60%)",
         }}
       />
 
@@ -45,35 +61,37 @@ export default async function Image() {
           display: "flex",
           flexDirection: "column",
           alignItems: "center",
-          background: "rgba(255, 255, 255, 0.05)",
-          border: "1px solid rgba(255, 255, 255, 0.1)",
-          borderRadius: "32px",
-          padding: "60px 80px",
-          boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.5)",
+          background: "rgba(255, 255, 255, 0.03)",
+          border: "1px solid rgba(255, 255, 255, 0.08)",
+          borderRadius: "40px",
+          padding: "70px 100px",
+          boxShadow: "0 30px 60px -15px rgba(0, 0, 0, 0.6)",
         }}
       >
-        {/* Explicit width and height attributes added here! */}
+        {/* Avatar */}
         <img
           src={avatarSrc}
           alt="Avatar"
-          width={180}
-          height={180}
+          width={200}
+          height={200}
           style={{
-            borderRadius: "90px",
-            border: "4px solid white",
+            borderRadius: "100px",
+            border: "4px solid rgba(255, 255, 255, 0.8)",
             marginBottom: "40px",
             objectFit: "cover",
+            boxShadow: "0 0 40px rgba(145,70,255,0.3)",
           }}
         />
 
         {/* Name */}
         <h1
           style={{
-            fontSize: "64px",
+            fontSize: "72px",
             fontWeight: "900",
-            color: "white",
-            margin: "0 0 20px 0",
-            letterSpacing: "-2px",
+            color: "#ffffff",
+            margin: "0 0 16px 0",
+            letterSpacing: "-0.04em",
+            lineHeight: 1,
           }}
         >
           {profileData.name}
@@ -84,8 +102,11 @@ export default async function Image() {
           style={{
             fontSize: "32px",
             color: "#a1a1aa",
-            margin: "0 0 10px 0",
+            margin: "0 0 40px 0",
             fontWeight: "500",
+            letterSpacing: "-0.01em",
+            textAlign: "center",
+            maxWidth: "800px",
           }}
         >
           {profileData.bio}
@@ -96,18 +117,35 @@ export default async function Image() {
           style={{
             display: "flex",
             alignItems: "center",
-            marginTop: "20px",
-            background: "rgba(145,70,255,0.2)",
-            padding: "10px 24px",
+            background: "rgba(145,70,255,0.15)",
+            border: "1px solid rgba(145,70,255,0.3)",
+            padding: "16px 32px",
             borderRadius: "999px",
             color: "#e9d5ff",
-            fontSize: "24px",
-            fontWeight: "bold",
+            fontSize: "28px",
+            fontWeight: "700",
+            letterSpacing: "-0.01em",
           }}
         >
-          <span style={{ marginRight: "12px" }}>🎮</span>
+          <span style={{ marginRight: "16px" }}>👾</span>
           {profileData.twitchTagline}
         </div>
+      </div>
+
+      {/* Footer URL Indicator */}
+      <div
+        style={{
+          position: "absolute",
+          bottom: "40px",
+          display: "flex",
+          alignItems: "center",
+          color: "#71717a",
+          fontSize: "24px",
+          fontWeight: "600",
+          letterSpacing: "0.05em",
+        }}
+      >
+        {appUrl.replace("https://", "").replace("http://", "")}
       </div>
     </div>,
     {
