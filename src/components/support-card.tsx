@@ -30,14 +30,14 @@ export function SupportCard() {
             });
           }
         }}
-        className="group relative flex w-full items-center justify-between overflow-hidden rounded-2xl border border-amber-200/60 bg-gradient-to-r from-amber-50 to-rose-50 p-4 shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-amber-300 hover:shadow-md dark:border-amber-900/30 dark:from-amber-950/20 dark:to-rose-950/20 dark:hover:border-amber-700/50"
+        className="group relative flex w-full items-center justify-between overflow-hidden rounded-2xl border border-amber-200/60 bg-linear-to-r from-amber-50 to-rose-50 p-4 shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-amber-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-amber-900/30 dark:from-amber-950/20 dark:to-rose-950/20 dark:hover:border-amber-700/50 dark:focus-visible:ring-offset-zinc-950"
       >
         {/* Ambient Glow Effect on Hover */}
-        <div className="absolute inset-0 -z-10 bg-gradient-to-r from-amber-500/0 to-rose-500/0 transition-colors duration-300 group-hover:from-amber-500/10 group-hover:to-rose-500/10 dark:group-hover:from-amber-500/20 dark:group-hover:to-rose-500/20" />
+        <div className="absolute inset-0 -z-10 bg-linear-to-r from-amber-500/0 to-rose-500/0 transition-colors duration-300 group-hover:from-amber-500/10 group-hover:to-rose-500/10 dark:group-hover:from-amber-500/20 dark:group-hover:to-rose-500/20" />
 
         {/* Icon & Text */}
         <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-gradient-to-br from-amber-400 to-rose-400 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
+          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-rose-400 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
             {/* Custom Heart Icon */}
             <svg
               xmlns="http://www.w3.org/2000/svg"

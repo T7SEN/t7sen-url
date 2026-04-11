@@ -68,7 +68,7 @@ export function TwitchCard() {
         href={`https://twitch.tv/${channel}`}
         target="_blank"
         rel="noopener noreferrer"
-        className="group relative block w-full overflow-hidden rounded-3xl border border-zinc-200/50 bg-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:border-[#9146FF]/50 hover:shadow-[#9146FF]/10 dark:border-zinc-800/50 dark:bg-zinc-950 dark:hover:shadow-[#9146FF]/10"
+        className="group relative block w-full overflow-hidden rounded-3xl border border-zinc-200/50 bg-white shadow-lg transition-all duration-300 hover:scale-[1.02] hover:border-[#9146FF]/50 hover:shadow-[#9146FF]/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-zinc-800/50 dark:bg-zinc-950 dark:hover:shadow-[#9146FF]/10 dark:focus-visible:ring-offset-zinc-950"
         onClick={() =>
           posthog.capture("twitch_card_clicked", {
             channel,
@@ -85,7 +85,7 @@ export function TwitchCard() {
             className="object-cover opacity-60 transition-transform duration-700 group-hover:scale-105 group-hover:opacity-80 dark:opacity-40 dark:group-hover:opacity-60"
             priority
           />
-          <div className="absolute inset-0 bg-gradient-to-t from-white via-transparent to-transparent dark:from-zinc-950" />
+          <div className="absolute inset-0 bg-linear-to-t from-white via-transparent to-transparent dark:from-zinc-950" />
         </div>
 
         {/* Card Body & Content */}

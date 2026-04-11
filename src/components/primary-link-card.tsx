@@ -27,7 +27,8 @@ export function PrimaryLinkCard({ link }: PrimaryLinkCardProps) {
     <Button
       variant="outline"
       size="lg"
-      className={`group/btn relative h-14 w-full overflow-hidden rounded-2xl border-zinc-200/80 bg-white/60 text-sm font-semibold transition-all hover:scale-[1.02] hover:bg-white hover:shadow-md active:scale-[0.98] dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 sm:text-base ${
+      // ✨ Added custom focus-visible ring classes here
+      className={`group/btn relative h-14 w-full overflow-hidden rounded-2xl border-zinc-200/80 bg-white/60 text-sm font-semibold transition-all hover:scale-[1.02] hover:bg-white hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 dark:focus-visible:ring-offset-zinc-950 sm:text-base ${
         link.isFeatured
           ? "shadow-[#9146FF]/5 border-[#9146FF]/30 dark:border-[#9146FF]/30"
           : ""

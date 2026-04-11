@@ -24,7 +24,6 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
       await navigator.clipboard.writeText(emailAddress);
       setCopied(true);
 
-      // Fire the exact same event the CLI wizard created
       if (posthog) {
         posthog.capture("social_link_clicked", {
           social_id: id,
@@ -42,7 +41,8 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
   return (
     <button
       onClick={handleCopy}
-      className="cursor-pointer group relative flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50"
+      // ✨ Added custom focus-visible ring classes here
+      className="group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50 dark:focus-visible:ring-offset-zinc-950 sm:h-12 sm:w-12"
       title={copied ? "Email Copied!" : title}
       aria-label={title}
     >
