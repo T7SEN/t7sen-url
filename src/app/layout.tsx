@@ -1,12 +1,13 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Space_Grotesk, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
 import { profileData } from "@/config/profile";
 import "./globals.css";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Initialize Space Grotesk
+const spaceGrotesk = Space_Grotesk({
+  variable: "--font-space-grotesk",
   subsets: ["latin"],
 });
 
@@ -41,10 +42,9 @@ export default function RootLayout({
 }>) {
   return (
     // suppressHydrationWarning is REQUIRED by next-themes to prevent console errors
-    // when injecting the dark mode class on the server vs client
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950`}
+        className={`${spaceGrotesk.variable} ${geistMono.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
       >
         <ThemeProvider
           attribute="class"
