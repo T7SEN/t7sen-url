@@ -1,61 +1,100 @@
 // src/components/primary-link-card.tsx
 "use client";
 
-import { Button } from "@/components/ui/button";
-import type { ProfileLink } from "@/config/profile";
+import * as React from "react";
+import { type ProfileLink } from "@/config/profile";
 import { usePostHog } from "posthog-js/react";
+import { motion } from "motion/react";
 
 interface PrimaryLinkCardProps {
   link: ProfileLink;
 }
 
-export function PrimaryLinkCard({ link }: PrimaryLinkCardProps) {
+export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
   const posthog = usePostHog();
-  const Icon = link.icon;
+  const { title, url, icon: Icon, isFeatured } = link;
 
   const handleClick = () => {
     if (posthog) {
-      posthog.capture("link_clicked", {
+      posthog.capture("primary_link_clicked", {
         link_id: link.id,
-        link_title: link.title,
-        link_url: link.url,
+        link_title: title,
+        link_url: url,
       });
     }
   };
 
-  return (
-    <Button
-      variant="outline"
-      size="lg"
-      // ✨ Added custom focus-visible ring classes here
-      className={`group/btn relative h-14 w-full overflow-hidden rounded-2xl border-zinc-200/80 bg-white/60 text-sm font-semibold transition-all hover:scale-[1.02] hover:bg-white hover:shadow-md active:scale-[0.98] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-zinc-800/80 dark:bg-zinc-900/60 dark:hover:bg-zinc-900 dark:focus-visible:ring-offset-zinc-950 sm:text-base ${
-        link.isFeatured
-          ? "shadow-[#9146FF]/5 border-[#9146FF]/30 dark:border-[#9146FF]/30"
-          : ""
-      }`}
-      asChild
-    >
+  if (isFeatured) {
+    return (
       <a
-        href={link.url}
+        href={url}
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleClick}
+        // 🚀 FIX: Reduced vertical padding (py-5), sleeker rounded corners
+        className="group relative flex w-full items-center justify-center overflow-hidden rounded-[20px] bg-[#030303] px-6 py-5 shadow-xl transition-all duration-500 hover:scale-[1.02] hover:shadow-[0_0_50px_-15px_rgba(145,70,255,0.5)]"
       >
-        {link.isFeatured && (
-          <div className="absolute inset-0 -z-10 animate-pulse bg-linear-to-r from-[#9146FF]/10 via-transparent to-[#9146FF]/10 opacity-50 dark:from-[#9146FF]/20 dark:to-[#9146FF]/20" />
-        )}
-
+        {/* 1. The Infinite Void (Cosmic Noise Background) */}
         <div
-          className={`absolute left-6 top-1/2 -translate-y-1/2 transition-colors ${
-            link.isFeatured
-              ? "text-[#9146FF] dark:text-[#9146FF]"
-              : "text-zinc-400 group-hover/btn:text-zinc-900 dark:group-hover/btn:text-zinc-50"
-          }`}
-        >
-          <Icon className="h-5 w-5 sm:h-6 sm:w-6" aria-hidden="true" />
+          className="absolute inset-0 z-0 opacity-0 mix-blend-screen transition-opacity duration-1000 group-hover:opacity-40"
+          style={{
+            backgroundImage:
+              'url("data:image/svg+xml,%3Csvg viewBox=%220 0 200 200%22 xmlns=%22http://www.w3.org/2000/svg%22%3E%3Cfilter id=%22noiseFilter%22%3E%3CfeTurbulence type=%22fractalNoise%22 baseFrequency=%220.8%22 numOctaves=%224%22 stitchTiles=%22stitch%22/%3E%3C/filter%3E%3Crect width=%22100%25%22 height=%22100%25%22 filter=%22url(%23noiseFilter)%22 opacity=%220.5%22/%3E%3C/svg%3E")',
+          }}
+        />
+
+        {/* 2. Six Eyes Gaze (Subtle Cyan Idle State) */}
+        <div className="absolute top-0 z-0 h-px w-3/4 bg-linear-to-r from-transparent via-cyan-400 to-transparent opacity-50 blur-[2px] transition-opacity duration-500 group-hover:opacity-0" />
+        <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-cyan-900/20 via-transparent to-transparent transition-opacity duration-500 group-hover:opacity-0" />
+
+        {/* --- THE HOLLOW PURPLE SEQUENCE --- */}
+
+        {/* Cursed Technique Lapse: Blue */}
+        <div className="absolute -left-[50%] top-1/2 z-0 h-40 w-40 -translate-y-1/2 rounded-full bg-blue-600 blur-2xl transition-all duration-600 ease-in group-hover:left-1/2 group-hover:-translate-x-1/2 group-hover:opacity-0" />
+
+        {/* Cursed Technique Reversal: Red */}
+        <div className="absolute -right-[50%] top-1/2 z-0 h-40 w-40 -translate-y-1/2 rounded-full bg-red-600 blur-2xl transition-all duration-600 ease-in group-hover:right-1/2 group-hover:translate-x-1/2 group-hover:opacity-0" />
+
+        {/* Hollow Technique: Purple (The Explosion) */}
+        <div className="absolute left-1/2 top-1/2 z-0 h-48 w-48 -translate-x-1/2 -translate-y-1/2 scale-0 rounded-full bg-[#9146FF] opacity-0 blur-[50px] transition-all duration-700 ease-out group-hover:scale-[3] group-hover:opacity-100 group-hover:delay-[400ms]" />
+
+        {/* --- FOREGROUND ELEMENTS --- */}
+        {/* 🚀 FIX: Changed to flex-row for horizontal layout, reduced gap */}
+        <div className="relative z-10 flex flex-row items-center gap-5 text-center">
+          {/* Floating Infinity Orb (Scaled down slightly) */}
+          <motion.div
+            animate={{ y: [0, -4, 0] }}
+            transition={{ duration: 4, repeat: Infinity, ease: "easeInOut" }}
+            className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-cyan-500/20 bg-black/50 shadow-[0_0_25px_rgba(6,182,212,0.15)] backdrop-blur-xl transition-all duration-700 group-hover:border-white/40 group-hover:bg-white/10 group-hover:shadow-[0_0_40px_rgba(255,255,255,0.4)] group-hover:delay-[400ms]"
+          >
+            <Icon className="h-5 w-5 text-cyan-300 transition-colors duration-700 group-hover:text-white group-hover:delay-[400ms]" />
+          </motion.div>
+
+          {/* Title Text (Slightly smaller to fit the sleek profile) */}
+          <span className="bg-linear-to-b from-zinc-100 to-zinc-500 bg-clip-text text-2xl font-black tracking-[0.15em] text-transparent transition-all duration-700 group-hover:from-white group-hover:to-purple-100 group-hover:delay-[400ms]">
+            {title}
+          </span>
         </div>
-        <span className="w-full text-center">{link.title}</span>
+
+        {/* Glassmorphic Boundary */}
+        <div className="pointer-events-none absolute inset-0 z-20 rounded-[20px] border border-white/5 transition-colors duration-700 group-hover:border-[#9146FF]/50 group-hover:delay-[400ms]" />
       </a>
-    </Button>
+    );
+  }
+
+  // Standard non-featured layout remains intact
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      onClick={handleClick}
+      className="flex w-full items-center gap-3 rounded-xl border border-zinc-200/50 bg-white/40 p-4 transition-all hover:scale-[1.02] hover:border-zinc-300 hover:bg-white hover:shadow-sm dark:border-zinc-800/50 dark:bg-zinc-950/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-900"
+    >
+      <Icon className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
+      <span className="font-medium text-zinc-800 dark:text-zinc-200">
+        {title}
+      </span>
+    </a>
   );
-}
+};
