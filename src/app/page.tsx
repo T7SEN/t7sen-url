@@ -12,6 +12,7 @@ import posthog from "posthog-js";
 import { CopyEmailButton } from "@/components/copy-email-button";
 import { SupportCard } from "@/components/support-card";
 import { motion, useMotionValue, useMotionTemplate } from "motion/react";
+import { MagneticWrapper } from "@/components/magnetic-wrapper";
 
 export default function Home() {
   const userInitials = profileData.name.slice(0, 2).toUpperCase();
@@ -40,9 +41,6 @@ export default function Home() {
         </div>
 
         <div className="z-10 flex w-full max-w-lg flex-col gap-4">
-          {/* Container Wrapper: Handles entrance, tracking, and base background.
-						We removed overflow-y-auto here so the border overlay doesn't scroll away. 
-					*/}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 40 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -56,11 +54,7 @@ export default function Home() {
             onMouseMove={handleMouseMove}
             className="group relative flex w-full max-w-lg max-h-[85dvh] flex-col rounded-3xl border border-zinc-200/50 bg-white/40 shadow-2xl backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-950/40"
           >
-            {/* ✨ The Reactive Border Mask ✨ 
-							This is a completely transparent div with a solid purple border.
-							The CSS mask ensures ONLY the part of the border near the mouse is visible.
-							It will NEVER bleed a spotlight into the background.
-						*/}
+            {/* ✨ The Reactive Border Mask ✨ */}
             <motion.div
               className="pointer-events-none absolute -inset-px z-50 rounded-3xl border border-[#9146FF] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               style={{
@@ -69,11 +63,8 @@ export default function Home() {
               }}
             />
 
-            {/* Inner Scrollable Content 
-							We moved the padding and scroll logic here so the content scrolls, but the card borders stay fixed.
-						*/}
+            {/* Inner Scrollable Content */}
             <div className="flex flex-col items-center gap-6 overflow-y-auto p-6 sm:p-8 [&::-webkit-scrollbar]:hidden [-ms-overflow-style:none] [scrollbar-width:none]">
-              {/* Header / Profile Section */}
               <header className="flex flex-col items-center gap-4 text-center">
                 <Avatar className="h-24 w-24 border-4 border-white shadow-xl animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-150 duration-700 dark:border-zinc-900">
                   <AvatarImage
@@ -96,12 +87,10 @@ export default function Home() {
                 </div>
               </header>
 
-              {/* 🎮 High-Fidelity Twitch Card 🎮 */}
               <div className="w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700">
                 <TwitchCard />
               </div>
 
-              {/* Primary Links Section */}
               <nav
                 className="flex w-full flex-col gap-3 animate-in fade-in slide-in-from-bottom-6 fill-mode-backwards delay-700 duration-700"
                 aria-label="Primary profile links"
@@ -151,10 +140,9 @@ export default function Home() {
                 })}
               </nav>
 
-              {/* Divider */}
               <div className="h-px w-full max-w-xs bg-zinc-200/50 animate-in fade-in fill-mode-backwards delay-[900ms] duration-700 dark:bg-zinc-800/50" />
 
-              {/* Secondary Social Row */}
+              {/* 🧲 Secondary Social Row (Now Magnetic!) 🧲 */}
               <nav
                 className="flex flex-wrap items-center justify-center gap-3 animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-[900ms] duration-700"
                 aria-label="Social media links"
@@ -164,50 +152,51 @@ export default function Home() {
 
                   if (social.id === "email") {
                     return (
-                      <CopyEmailButton
-                        key={social.id}
-                        id={social.id}
-                        emailUrl={social.url}
-                        title={social.title}
-                      />
+                      <MagneticWrapper key={social.id}>
+                        <CopyEmailButton
+                          id={social.id}
+                          emailUrl={social.url}
+                          title={social.title}
+                        />
+                      </MagneticWrapper>
                     );
                   }
 
                   return (
-                    <Button
-                      key={social.id}
-                      variant="ghost"
-                      size="icon"
-                      className="h-10 w-10 rounded-full border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50 sm:h-12 sm:w-12"
-                      asChild
-                    >
-                      <a
-                        href={social.url}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        title={social.title}
-                        onClick={() =>
-                          posthog.capture("social_link_clicked", {
-                            social_id: social.id,
-                            social_title: social.title,
-                            social_url: social.url,
-                          })
-                        }
+                    <MagneticWrapper key={social.id}>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-10 w-10 rounded-xl border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50 sm:h-12 sm:w-12"
+                        asChild
                       >
-                        <Icon
-                          className="h-4 w-4 sm:h-5 sm:w-5"
-                          aria-hidden="true"
-                        />
-                        <span className="sr-only">{social.title}</span>
-                      </a>
-                    </Button>
+                        <a
+                          href={social.url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title={social.title}
+                          onClick={() =>
+                            posthog.capture("social_link_clicked", {
+                              social_id: social.id,
+                              social_title: social.title,
+                              social_url: social.url,
+                            })
+                          }
+                        >
+                          <Icon
+                            className="h-4 w-4 sm:h-5 sm:w-5"
+                            aria-hidden="true"
+                          />
+                          <span className="sr-only">{social.title}</span>
+                        </a>
+                      </Button>
+                    </MagneticWrapper>
                   );
                 })}
               </nav>
             </div>
           </motion.div>
 
-          {/* Support Card */}
           <div className="w-full shrink-0 rounded-2xl shadow-xl backdrop-blur-xl animate-in fade-in slide-in-from-bottom-8 fill-mode-backwards delay-[1000ms] duration-700">
             <SupportCard />
           </div>
