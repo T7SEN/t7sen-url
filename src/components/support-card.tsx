@@ -30,56 +30,60 @@ export function SupportCard() {
             });
           }
         }}
-        className="group relative flex w-full items-center justify-between overflow-hidden rounded-2xl border border-amber-200/60 bg-linear-to-r from-amber-50 to-rose-50 p-4 shadow-sm transition-all duration-300 hover:scale-[1.02] hover:border-amber-300 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-amber-900/30 dark:from-amber-950/20 dark:to-rose-950/20 dark:hover:border-amber-700/50 dark:focus-visible:ring-offset-zinc-950"
+        // 🚀 THE ARCHITECTURE: The Obsidian Sigil.
+        // Uses a 1px gap to reveal a sharp, static gradient border.
+        className="group relative flex w-full items-center justify-between overflow-hidden rounded-2xl p-px bg-linear-to-b from-zinc-200/50 to-transparent transition-all duration-500 hover:scale-[1.02] hover:from-[#9146FF]/50 hover:to-transparent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:from-zinc-800/50 dark:focus-visible:ring-offset-zinc-950"
       >
-        {/* Ambient Glow Effect on Hover */}
-        <div className="absolute inset-0 -z-10 bg-linear-to-r from-amber-500/0 to-rose-500/0 transition-colors duration-300 group-hover:from-amber-500/10 group-hover:to-rose-500/10 dark:group-hover:from-amber-500/20 dark:group-hover:to-rose-500/20" />
+        {/* Inner Content Layer (Glass Chassis) */}
+        <div className="relative flex w-full items-center justify-between rounded-[calc(1rem-1px)] bg-white/80 p-4 backdrop-blur-md transition-colors duration-500 group-hover:bg-white dark:bg-[#030303]/90 dark:group-hover:bg-[#030303]">
+          {/* Left Section: Branding & Identity */}
+          <div className="flex items-center gap-4">
+            {/* The "Soul" Icon Container: Muted until hover */}
+            <div className="relative flex h-11 w-11 items-center justify-center rounded-xl border border-zinc-200 bg-zinc-50 shadow-sm transition-all duration-500 group-hover:border-[#9146FF]/30 group-hover:bg-[#9146FF]/5 dark:border-zinc-800 dark:bg-zinc-900 dark:group-hover:border-[#9146FF]/50">
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                width="22"
+                height="22"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2.5"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="text-zinc-400 transition-all duration-500 group-hover:scale-110 group-hover:text-[#9146FF] dark:text-zinc-600"
+              >
+                <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+              </svg>
+            </div>
 
-        {/* Icon & Text */}
-        <div className="flex items-center gap-4">
-          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-linear-to-br from-amber-400 to-rose-400 text-white shadow-sm transition-transform duration-300 group-hover:scale-110 group-hover:rotate-12">
-            {/* Custom Heart Icon */}
+            {/* Text Content */}
+            <div className="flex flex-col text-left">
+              <h3 className="text-sm font-black uppercase tracking-[0.15em] text-zinc-900 dark:text-zinc-100">
+                {support.title}
+              </h3>
+              <p className="text-[11px] font-bold text-[#9146FF]/80 transition-colors duration-500 group-hover:text-[#9146FF]">
+                {support.subtitle}
+              </p>
+            </div>
+          </div>
+
+          {/* Right Section: Minimalist Action Arrow */}
+          <div className="flex h-8 w-8 items-center justify-center rounded-full border border-zinc-100 text-zinc-300 transition-all duration-500 group-hover:translate-x-1 group-hover:border-[#9146FF]/20 group-hover:bg-[#9146FF]/5 group-hover:text-[#9146FF] dark:border-zinc-800 dark:text-zinc-800">
             <svg
-              xmlns="http://www.w3.org/2000/svg"
-              width="20"
-              height="20"
-              viewBox="0 0 24 24"
+              width="16"
+              height="16"
+              viewBox="0 0 15 15"
               fill="none"
-              stroke="currentColor"
-              strokeWidth="2.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+              xmlns="http://www.w3.org/2000/svg"
             >
-              <path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" />
+              <path
+                d="M6.1584 3.13508C6.35985 2.95662 6.66436 2.97484 6.84283 3.1763L10.3428 7.1763C10.5053 7.36195 10.5053 7.63805 10.3428 7.8237L6.84283 11.8237C6.66436 12.0252 6.35985 12.0434 6.1584 11.8649C5.95694 11.6865 5.93872 11.382 6.11718 11.1805L9.27878 7.5L6.11718 3.81949C5.93872 3.61803 5.95694 3.31353 6.1584 3.13508Z"
+                fill="currentColor"
+                fillRule="evenodd"
+                clipRule="evenodd"
+              />
             </svg>
           </div>
-          <div className="text-left">
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-50">
-              {support.title}
-            </h3>
-            <p className="text-xs font-medium text-zinc-500 dark:text-zinc-400">
-              {support.subtitle}
-            </p>
-          </div>
-        </div>
-
-        {/* Arrow Indicator */}
-        <div className="text-amber-500/70 transition-transform duration-300 group-hover:translate-x-1 group-hover:text-amber-600 dark:text-amber-500/50 dark:group-hover:text-amber-400">
-          <svg
-            width="15"
-            height="15"
-            viewBox="0 0 15 15"
-            fill="none"
-            xmlns="http://www.w3.org/2000/svg"
-            className="h-5 w-5"
-          >
-            <path
-              d="M6.1584 3.13508C6.35985 2.95662 6.66436 2.97484 6.84283 3.1763L10.3428 7.1763C10.5053 7.36195 10.5053 7.63805 10.3428 7.8237L6.84283 11.8237C6.66436 12.0252 6.35985 12.0434 6.1584 11.8649C5.95694 11.6865 5.93872 11.382 6.11718 11.1805L9.27878 7.5L6.11718 3.81949C5.93872 3.61803 5.95694 3.31353 6.1584 3.13508Z"
-              fill="currentColor"
-              fillRule="evenodd"
-              clipRule="evenodd"
-            ></path>
-          </svg>
         </div>
       </a>
     </motion.div>
