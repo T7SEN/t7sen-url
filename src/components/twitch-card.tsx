@@ -216,9 +216,9 @@ export function TwitchCard() {
               </div>
 
               <div className="text-left">
-                <h3 className="text-xl font-black tracking-tight text-zinc-900 transition-colors duration-300 group-hover:text-zinc-700 dark:text-zinc-50 dark:group-hover:text-white">
+                <h2 className="text-xl font-black tracking-tight text-zinc-900 transition-colors duration-300 group-hover:text-zinc-700 dark:text-zinc-50 dark:group-hover:text-white">
                   {channel}
-                </h3>
+                </h2>
                 <p className="text-sm font-medium text-zinc-500 transition-colors duration-300 group-hover:text-zinc-600 dark:text-zinc-400 dark:group-hover:text-zinc-300">
                   {profileData.twitchTagline}
                 </p>

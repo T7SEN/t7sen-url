@@ -82,9 +82,9 @@ export function SupportCard() {
             </div>
 
             <div className="flex flex-col text-left">
-              <h3 className="text-sm font-black uppercase tracking-[0.15em] text-zinc-900 dark:text-zinc-100">
+              <h2 className="text-sm font-black uppercase tracking-[0.15em] text-zinc-900 dark:text-zinc-100">
                 {support.title}
-              </h3>
+              </h2>
               <p
                 className={cn(
                   "text-[11px] font-bold transition-colors duration-500",
