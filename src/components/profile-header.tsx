@@ -1,5 +1,5 @@
 // src/components/profile-header.tsx
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import Image from "next/image";
 import { profileData } from "@/config/profile";
 
 export function ProfileHeader() {
@@ -7,17 +7,21 @@ export function ProfileHeader() {
 
   return (
     <header className="flex flex-col items-center gap-4 text-center">
-      <div className="rounded-full p-0.5 bg-linear-to-b from-[#9146FF] to-zinc-800 shadow-2xl animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-150 duration-700 dark:to-zinc-950">
-        <Avatar className="h-24 w-24 border-2 border-white dark:border-[#030303]">
-          <AvatarImage
+      <div className="relative flex h-24 w-24 items-center justify-center rounded-full p-0.5 bg-linear-to-b from-[#9146FF] to-zinc-800 shadow-2xl animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-150 duration-700 dark:to-zinc-950">
+        <div className="relative h-full w-full overflow-hidden rounded-full border-2 border-white dark:border-[#030303] bg-zinc-200 dark:bg-zinc-800 flex items-center justify-center">
+          <span className="absolute text-xl font-bold text-zinc-500 dark:text-zinc-400">
+            {userInitials}
+          </span>
+          {/* 🚀 Next.js Image with 'priority' forces instant LCP loading */}
+          <Image
             src={profileData.avatarUrl}
             alt={`${profileData.name} avatar`}
-            className="object-cover"
+            fill
+            priority
+            sizes="96px"
+            className="object-cover relative z-10"
           />
-          <AvatarFallback className="bg-zinc-200 text-xl font-bold dark:bg-zinc-800">
-            {userInitials}
-          </AvatarFallback>
-        </Avatar>
+        </div>
       </div>
 
       <div className="space-y-1.5 animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-300 duration-700">
