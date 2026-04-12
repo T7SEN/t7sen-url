@@ -2,9 +2,44 @@
 import { NextResponse } from "next/server";
 import { getPostHogClient } from "@/lib/posthog-server";
 
-// ✨ In-memory cache for DigitalOcean Node process
+// --- IN-MEMORY CACHES ---
 let cachedToken: string | null = null;
 let tokenExpiryTime: number = 0;
+
+// Rate Limiting Map: Tracks requests per IP address
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const WINDOW_MS = 60000; // 1 minute window
+const MAX_REQUESTS = 10; // Max 10 requests per minute per IP
+
+/**
+ * Validates the IP against our in-memory rate limiter.
+ * Also performs lazy garbage collection to prevent memory leaks.
+ */
+function checkRateLimit(ip: string): boolean {
+  const now = Date.now();
+
+  // Lazy Garbage Collection: Clear stale entries if the map gets too large
+  if (rateLimitMap.size > 1000) {
+    for (const [key, value] of rateLimitMap.entries()) {
+      if (now > value.resetTime) rateLimitMap.delete(key);
+    }
+  }
+
+  const record = rateLimitMap.get(ip);
+
+  if (!record || now > record.resetTime) {
+    // First request or window expired: Reset to 1
+    rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
+    return true;
+  }
+
+  if (record.count >= MAX_REQUESTS) {
+    return false; // Rate limit exceeded
+  }
+
+  record.count += 1;
+  return true;
+}
 
 const fetchWithTimeout = async (
   url: string,
@@ -29,16 +64,12 @@ const fetchWithTimeout = async (
   }
 };
 
-/**
- * Safely fetches and caches the Twitch OAuth token in memory.
- */
 async function getTwitchAccessToken(
   clientId: string,
   clientSecret: string,
 ): Promise<string> {
   const now = Date.now();
 
-  // Return cached token if it exists and is valid for at least 5 more minutes
   if (cachedToken && tokenExpiryTime > now + 300000) {
     return cachedToken;
   }
@@ -56,7 +87,7 @@ async function getTwitchAccessToken(
       headers: {
         "Content-Type": "application/x-www-form-urlencoded",
       },
-      body: params.toString(), // ✨ Securely passed in body
+      body: params.toString(),
     },
     5000,
   );
@@ -71,16 +102,27 @@ async function getTwitchAccessToken(
     throw new Error("Invalid token payload received from Twitch");
   }
 
-  // Cache the token in memory based on Twitch's explicit expiry time
   cachedToken = tokenData.access_token;
   tokenExpiryTime = now + tokenData.expires_in * 1000;
 
-  // Return the strictly typed local variable instead of the global one
   return tokenData.access_token;
 }
 
 export async function GET(request: Request) {
   try {
+    // 1. Rate Limiting Check
+    // Extract IP from DigitalOcean/Vercel standard headers
+    const forwardedFor = request.headers.get("x-forwarded-for");
+    const ip = forwardedFor ? forwardedFor.split(",")[0] : "unknown-ip";
+
+    if (!checkRateLimit(ip)) {
+      console.warn(`Rate limit exceeded for IP: ${ip}`);
+      return NextResponse.json(
+        { error: "Too Many Requests" },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    }
+
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get("channel");
 
@@ -102,10 +144,10 @@ export async function GET(request: Request) {
       );
     }
 
-    // 1. Get Token (from memory or fresh fetch)
+    // 2. Get Token
     const accessToken = await getTwitchAccessToken(clientId, clientSecret);
 
-    // 2. Fetch Stream Status
+    // 3. Fetch Stream Status
     const streamResponse = await fetchWithTimeout(
       `https://api.twitch.tv/helix/streams?user_login=${channel}`,
       {
@@ -113,7 +155,6 @@ export async function GET(request: Request) {
           "Client-ID": clientId,
           Authorization: `Bearer ${accessToken}`,
         },
-        // Next.js Data Cache handles GET requests perfectly
         next: { revalidate: 60 },
       },
       5000,
@@ -126,11 +167,11 @@ export async function GET(request: Request) {
     const streamData = await streamResponse.json();
     const isLive = Array.isArray(streamData.data) && streamData.data.length > 0;
 
-    // 3. Analytics
+    // 4. Analytics
     try {
       const posthog = getPostHogClient();
       posthog.capture({
-        distinctId: "anonymous",
+        distinctId: ip, // Using IP to uniquely identify API callers anonymously
         event: "twitch_api_called",
         properties: { channel, is_live: isLive },
       });
@@ -139,7 +180,7 @@ export async function GET(request: Request) {
       console.error("PostHog Tracking Error:", analyticsError);
     }
 
-    // 4. Return Data
+    // 5. Return Data
     return NextResponse.json(
       { isLive },
       {
