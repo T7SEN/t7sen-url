@@ -1,7 +1,7 @@
 // src/app/page.tsx
 "use client";
 
-import React from "react";
+import React, { useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SpotlightBackground } from "@/components/ui/spotlight-background";
@@ -19,8 +19,8 @@ import { MagneticWrapper } from "@/components/magnetic-wrapper";
 import { ProfileHeader } from "@/components/profile-header";
 import { PrimaryLinkCard } from "@/components/primary-link-card";
 import { usePostHog } from "posthog-js/react";
+import { logger } from "@/lib/logger";
 
-// ✨ 1. Explicitly type as Variants
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
   show: {
@@ -32,14 +32,13 @@ const containerVariants: Variants = {
   },
 };
 
-// ✨ 2. Explicitly type as Variants
 const itemVariants: Variants = {
   hidden: { opacity: 0, y: 20 },
   show: {
     opacity: 1,
     y: 0,
     transition: {
-      type: "spring", // TypeScript now perfectly understands this literal
+      type: "spring",
       stiffness: 300,
       damping: 24,
     },
@@ -52,6 +51,12 @@ export default function Home() {
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
+
+  useEffect(() => {
+    logger.info("User visited profile landing page", {
+      tags: { page: "home" },
+    });
+  }, []);
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
     const { left, top } = e.currentTarget.getBoundingClientRect();
@@ -67,7 +72,6 @@ export default function Home() {
         </div>
 
         <div className="z-10 flex w-full max-w-lg flex-col gap-4">
-          {/* Main Glassmorphic Container */}
           <motion.div
             initial={{ opacity: 0, scale: 0.9, y: 40 }}
             animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -89,7 +93,6 @@ export default function Home() {
               }}
             />
 
-            {/* ✨ 3. The Orchestration Wrapper ✨ */}
             <motion.div
               variants={containerVariants}
               initial="hidden"
@@ -160,6 +163,16 @@ export default function Home() {
                                 social_url: social.url,
                               });
                             }
+
+                            logger.info(
+                              `User clicked social link: ${social.title}`,
+                              {
+                                tags: {
+                                  component: "SocialButton",
+                                  socialId: social.id,
+                                },
+                              },
+                            );
                           }}
                         >
                           <Icon

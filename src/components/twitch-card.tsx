@@ -14,7 +14,7 @@ import { profileData } from "@/config/profile";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import useSWR from "swr";
-
+import { logger } from "@/lib/logger";
 
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
@@ -34,15 +34,22 @@ export function TwitchCard() {
     [mouseX, mouseY],
   );
 
-  // SWR Integration: Replaces useEffect, useState, and setInterval
   const { data, error } = useSWR(`/api/twitch?channel=${channel}`, fetcher, {
-    refreshInterval: 60000, // Poll every 60 seconds automatically
-    revalidateOnFocus: true, // Instantly refresh when the user returns to the tab
-    shouldRetryOnError: false, // Don't aggressively retry if the API is truly down
+    refreshInterval: 60000,
+    revalidateOnFocus: true,
+    shouldRetryOnError: false,
   });
 
-  // Derive the live status explicitly based on SWR's reactive states
+  React.useEffect(() => {
+    if (error) {
+      logger.error(error, {
+        tags: { component: "TwitchCard", issue: "swr_fetch_failed" },
+      });
+    }
+  }, [error]);
+
   let isLive: boolean | null = null;
+
   if (error) {
     isLive = false;
   } else if (data !== undefined) {
@@ -64,6 +71,11 @@ export function TwitchCard() {
         is_live: isLive,
       });
     }
+
+    logger.info("Twitch card clicked", {
+      tags: { component: "TwitchCard" },
+      extra: { channel, isLive },
+    });
   };
 
   if (isLive === null) {

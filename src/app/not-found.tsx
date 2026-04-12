@@ -2,10 +2,21 @@
 "use client";
 
 import Link from "next/link";
+import { useEffect } from "react";
+import { usePathname } from "next/navigation";
 import { motion } from "motion/react";
 import { SpotlightBackground } from "@/components/ui/spotlight-background";
+import { logger } from "@/lib/logger";
 
 export default function NotFound() {
+  const pathname = usePathname();
+
+  useEffect(() => {
+    logger.warn("User encountered 404 Not Found", {
+      tags: { boundary: "not-found", path: pathname || "unknown" },
+    });
+  }, [pathname]);
+
   return (
     <SpotlightBackground>
       <main className="relative flex h-dvh w-full flex-col items-center justify-center overflow-hidden px-4 font-sans sm:px-6">
@@ -32,11 +43,8 @@ export default function NotFound() {
             href="/"
             className="group relative flex items-center justify-center overflow-hidden rounded-xl bg-zinc-900 px-8 py-3.5 font-bold text-white shadow-xl transition-all duration-300 hover:scale-105 hover:shadow-[0_0_40px_-10px_rgba(145,70,255,0.5)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:bg-white dark:text-zinc-900 dark:focus-visible:ring-offset-zinc-950"
           >
-            {/* Hover Gradient Blast */}
-            <div className="absolute inset-0 z-0 bg-linear-to-r from-[#9146FF] to-cyan-500 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-            <span className="relative z-10 transition-colors duration-300 group-hover:text-white">
-              Return Home
-            </span>
+            <div className="absolute inset-0 z-0 bg-linear-to-r from-[#9146FF] to-purple-600 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+            <span className="relative z-10 transition-colors duration-300 group-hover:text-white">Return to Reality</span>
           </Link>
         </motion.div>
       </main>

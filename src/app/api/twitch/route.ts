@@ -1,24 +1,18 @@
 // src/app/api/twitch/route.ts
 import { NextResponse } from "next/server";
 import { getPostHogClient } from "@/lib/posthog-server";
+import { logger } from "@/lib/logger";
 
-// --- IN-MEMORY CACHES ---
 let cachedToken: string | null = null;
 let tokenExpiryTime: number = 0;
 
-// Rate Limiting Map: Tracks requests per IP address
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const WINDOW_MS = 60000; // 1 minute window
-const MAX_REQUESTS = 10; // Max 10 requests per minute per IP
+const WINDOW_MS = 60000;
+const MAX_REQUESTS = 10;
 
-/**
- * Validates the IP against our in-memory rate limiter.
- * Also performs lazy garbage collection to prevent memory leaks.
- */
 function checkRateLimit(ip: string): boolean {
   const now = Date.now();
 
-  // Lazy Garbage Collection: Clear stale entries if the map gets too large
   if (rateLimitMap.size > 1000) {
     for (const [key, value] of rateLimitMap.entries()) {
       if (now > value.resetTime) rateLimitMap.delete(key);
@@ -28,13 +22,13 @@ function checkRateLimit(ip: string): boolean {
   const record = rateLimitMap.get(ip);
 
   if (!record || now > record.resetTime) {
-    // First request or window expired: Reset to 1
     rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
     return true;
   }
 
   if (record.count >= MAX_REQUESTS) {
-    return false; // Rate limit exceeded
+    logger.warn("Rate limit exceeded", { tags: { ip, route: "/api/twitch" } });
+    return false;
   }
 
   record.count += 1;
@@ -74,6 +68,8 @@ async function getTwitchAccessToken(
     return cachedToken;
   }
 
+  logger.breadcrumb("Fetching new Twitch access token", "api.twitch.auth");
+
   const params = new URLSearchParams({
     client_id: clientId,
     client_secret: clientSecret,
@@ -105,6 +101,10 @@ async function getTwitchAccessToken(
   cachedToken = tokenData.access_token;
   tokenExpiryTime = now + tokenData.expires_in * 1000;
 
+  logger.info("Successfully acquired Twitch access token", {
+    tags: { layer: "backend", route: "/api/twitch" },
+  });
+
   return tokenData.access_token;
 }
 
@@ -114,7 +114,6 @@ export async function GET(request: Request) {
     const ip = forwardedFor ? forwardedFor.split(",")[0] : "unknown-ip";
 
     if (!checkRateLimit(ip)) {
-      console.warn(`Rate limit exceeded for IP: ${ip}`);
       return NextResponse.json(
         { error: "Too Many Requests" },
         { status: 429, headers: { "Retry-After": "60" } },
@@ -125,6 +124,9 @@ export async function GET(request: Request) {
     const channel = searchParams.get("channel");
 
     if (!channel) {
+      logger.warn("Twitch API called without channel parameter", {
+        tags: { ip },
+      });
       return NextResponse.json(
         { error: "Channel name is required" },
         { status: 400 },
@@ -134,9 +136,9 @@ export async function GET(request: Request) {
     const isValidTwitchUsername = /^[a-zA-Z0-9_]{2,25}$/.test(channel);
 
     if (!isValidTwitchUsername) {
-      console.warn(
-        `Blocked invalid channel parameter: ${channel.substring(0, 50)}`,
-      );
+      logger.warn("Blocked invalid channel parameter", {
+        tags: { channel: channel.substring(0, 50) },
+      });
       return NextResponse.json(
         { error: "Invalid channel format" },
         { status: 400 },
@@ -147,7 +149,9 @@ export async function GET(request: Request) {
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
     if (!clientId || !clientSecret) {
-      console.error("Twitch API Error: Missing OAuth credentials.");
+      logger.error("Twitch API Error: Missing OAuth credentials", {
+        tags: { route: "/api/twitch" },
+      });
       return NextResponse.json(
         { isLive: false, error: "Server misconfiguration" },
         { status: 500 },
@@ -155,6 +159,11 @@ export async function GET(request: Request) {
     }
 
     const accessToken = await getTwitchAccessToken(clientId, clientSecret);
+
+    logger.breadcrumb(
+      `Fetching stream status for ${channel}`,
+      "api.twitch.data",
+    );
 
     const streamResponse = await fetchWithTimeout(
       `https://api.twitch.tv/helix/streams?user_login=${channel}`,
@@ -178,13 +187,15 @@ export async function GET(request: Request) {
     try {
       const posthog = getPostHogClient();
       posthog.capture({
-        distinctId: ip, // Using IP to uniquely identify API callers anonymously
+        distinctId: ip,
         event: "twitch_api_called",
         properties: { channel, is_live: isLive },
       });
       await posthog.shutdown();
     } catch (analyticsError: unknown) {
-      console.error("PostHog Tracking Error:", analyticsError);
+      logger.error(analyticsError, {
+        tags: { component: "PostHogServer" },
+      });
     }
 
     return NextResponse.json(
@@ -197,9 +208,9 @@ export async function GET(request: Request) {
       },
     );
   } catch (error: unknown) {
-    const errorMessage =
-      error instanceof Error ? error.message : "Unknown Error";
-    console.error("Twitch API Route Exception:", errorMessage);
+    logger.error(error, {
+      tags: { route: "/api/twitch", layer: "backend" },
+    });
 
     return NextResponse.json({ isLive: false }, { status: 500 });
   }

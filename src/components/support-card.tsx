@@ -5,12 +5,26 @@ import { motion } from "motion/react";
 import { usePostHog } from "posthog-js/react";
 import { profileData } from "@/config/profile";
 import { cn } from "@/lib/utils";
+import { logger } from "@/lib/logger";
 
 export function SupportCard() {
   const posthog = usePostHog();
   const support = profileData.support;
 
   if (!support) return null;
+
+  const handleClick = () => {
+    if (posthog) {
+      posthog.capture("support_link_clicked", {
+        support_id: support.id,
+        support_url: support.url,
+      });
+    }
+
+    logger.info("Support card clicked", {
+      tags: { component: "SupportCard", supportId: support.id },
+    });
+  };
 
   return (
     <motion.div
@@ -23,24 +37,14 @@ export function SupportCard() {
         href={support.url}
         target="_blank"
         rel="noopener noreferrer"
-        onClick={() => {
-          if (posthog) {
-            posthog.capture("support_link_clicked", {
-              support_id: support.id,
-              support_url: support.url,
-            });
-          }
-        }}
+        onClick={handleClick}
         className={cn(
           "group relative flex w-full items-center justify-between overflow-hidden rounded-2xl p-px transition-all duration-500 hover:scale-[1.02]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
-          // Base Gradient Border
           "bg-linear-to-b from-zinc-200/50 to-transparent dark:from-zinc-800/50",
-          // ✨ Explicit Hover specificities for both themes
           "hover:from-[#9146FF]/50 dark:hover:from-[#9146FF]/50",
         )}
       >
-        {/* Inner Content Layer (Glass Chassis) */}
         <div
           className={cn(
             "relative flex w-full items-center justify-between rounded-[calc(1rem-1px)] p-4 backdrop-blur-md transition-colors duration-500",
@@ -48,9 +52,7 @@ export function SupportCard() {
             "dark:bg-[#030303]/90 dark:group-hover:bg-[#030303]",
           )}
         >
-          {/* Left Section: Branding & Identity */}
           <div className="flex items-center gap-4">
-            {/* The "Soul" Icon Container */}
             <div
               className={cn(
                 "relative flex h-11 w-11 items-center justify-center rounded-xl border shadow-sm transition-all duration-500",
@@ -79,7 +81,6 @@ export function SupportCard() {
               </svg>
             </div>
 
-            {/* Text Content */}
             <div className="flex flex-col text-left">
               <h3 className="text-sm font-black uppercase tracking-[0.15em] text-zinc-900 dark:text-zinc-100">
                 {support.title}
@@ -96,7 +97,6 @@ export function SupportCard() {
             </div>
           </div>
 
-          {/* Right Section: Minimalist Action Arrow */}
           <div
             className={cn(
               "flex h-8 w-8 items-center justify-center rounded-full border transition-all duration-500 group-hover:translate-x-1",
