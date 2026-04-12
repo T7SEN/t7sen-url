@@ -34,6 +34,12 @@ const nextConfig: NextConfig = {
   reactCompiler: true,
   experimental: {
     optimizeCss: true,
+    optimizePackageImports: [
+      "lucide-react",
+      "motion/react",
+      "posthog-js",
+      "@sentry/nextjs",
+    ],
   },
   async headers() {
     return [
