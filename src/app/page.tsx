@@ -2,13 +2,12 @@
 "use client";
 
 import React, { useEffect } from "react";
+import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { SpotlightBackground } from "@/components/ui/spotlight-background";
-import { TwitchCard } from "@/components/twitch-card";
 import { profileData } from "@/config/profile";
 import { CopyEmailButton } from "@/components/copy-email-button";
-import { SupportCard } from "@/components/support-card";
 import {
   motion,
   useMotionValue,
@@ -20,6 +19,24 @@ import { ProfileHeader } from "@/components/profile-header";
 import { PrimaryLinkCard } from "@/components/primary-link-card";
 import { usePostHog } from "posthog-js/react";
 import { logger } from "@/lib/logger";
+
+// 🚀 Dynamically import heavy interactive components
+const TwitchCard = dynamic(
+  () => import("@/components/twitch-card").then((mod) => mod.TwitchCard),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="h-32 w-full animate-pulse rounded-3xl bg-zinc-200/50 dark:bg-zinc-800/50" />
+    ),
+  },
+);
+
+const SupportCard = dynamic(
+  () => import("@/components/support-card").then((mod) => mod.SupportCard),
+  {
+    ssr: false,
+  },
+);
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
