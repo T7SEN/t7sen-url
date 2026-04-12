@@ -110,8 +110,6 @@ async function getTwitchAccessToken(
 
 export async function GET(request: Request) {
   try {
-    // 1. Rate Limiting Check
-    // Extract IP from DigitalOcean/Vercel standard headers
     const forwardedFor = request.headers.get("x-forwarded-for");
     const ip = forwardedFor ? forwardedFor.split(",")[0] : "unknown-ip";
 
@@ -133,6 +131,18 @@ export async function GET(request: Request) {
       );
     }
 
+    const isValidTwitchUsername = /^[a-zA-Z0-9_]{2,25}$/.test(channel);
+
+    if (!isValidTwitchUsername) {
+      console.warn(
+        `Blocked invalid channel parameter: ${channel.substring(0, 50)}`,
+      );
+      return NextResponse.json(
+        { error: "Invalid channel format" },
+        { status: 400 },
+      );
+    }
+
     const clientId = process.env.TWITCH_CLIENT_ID;
     const clientSecret = process.env.TWITCH_CLIENT_SECRET;
 
@@ -144,10 +154,8 @@ export async function GET(request: Request) {
       );
     }
 
-    // 2. Get Token
     const accessToken = await getTwitchAccessToken(clientId, clientSecret);
 
-    // 3. Fetch Stream Status
     const streamResponse = await fetchWithTimeout(
       `https://api.twitch.tv/helix/streams?user_login=${channel}`,
       {
@@ -167,7 +175,6 @@ export async function GET(request: Request) {
     const streamData = await streamResponse.json();
     const isLive = Array.isArray(streamData.data) && streamData.data.length > 0;
 
-    // 4. Analytics
     try {
       const posthog = getPostHogClient();
       posthog.capture({
@@ -180,7 +187,6 @@ export async function GET(request: Request) {
       console.error("PostHog Tracking Error:", analyticsError);
     }
 
-    // 5. Return Data
     return NextResponse.json(
       { isLive },
       {
