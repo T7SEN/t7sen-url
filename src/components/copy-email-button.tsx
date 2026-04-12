@@ -2,7 +2,7 @@
 "use client";
 
 import * as React from "react";
-import { motion, AnimatePresence } from "motion/react";
+import { m as motion, AnimatePresence } from "motion/react";
 import { Icons } from "@/components/icons";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";

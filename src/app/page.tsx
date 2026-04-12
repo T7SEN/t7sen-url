@@ -9,7 +9,7 @@ import { SpotlightBackground } from "@/components/ui/spotlight-background";
 import { profileData } from "@/config/profile";
 import { CopyEmailButton } from "@/components/copy-email-button";
 import {
-  motion,
+  m as motion,
   useMotionValue,
   useMotionTemplate,
   type Variants,

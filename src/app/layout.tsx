@@ -2,6 +2,8 @@
 import type { Metadata } from "next";
 import { Space_Grotesk, Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "@/components/theme-provider";
+import { MotionProvider } from "@/components/motion-provider";
+import { PostHogProvider } from "@/components/posthog-provider";
 import { profileData } from "@/config/profile";
 import "./globals.css";
 
@@ -69,14 +71,17 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${geistMono.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="system"
-          enableSystem
-          disableTransitionOnChange
-        >
-          {children}
-        </ThemeProvider>
+        {/* 🚀 Injecting our optimized providers */}
+        <PostHogProvider>
+          <ThemeProvider
+            attribute="class"
+            defaultTheme="system"
+            enableSystem
+            disableTransitionOnChange
+          >
+            <MotionProvider>{children}</MotionProvider>
+          </ThemeProvider>
+        </PostHogProvider>
       </body>
     </html>
   );

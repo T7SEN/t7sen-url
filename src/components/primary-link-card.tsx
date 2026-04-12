@@ -1,10 +1,9 @@
 // src/components/primary-link-card.tsx
 "use client";
 
-import * as React from "react";
 import { type ProfileLink } from "@/config/profile";
 import { usePostHog } from "posthog-js/react";
-import { motion } from "motion/react";
+import { m as motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 

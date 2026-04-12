@@ -1,7 +1,7 @@
 // src/components/support-card.tsx
 "use client";
 
-import { motion } from "motion/react";
+import { m as motion } from "motion/react";
 import { usePostHog } from "posthog-js/react";
 import { profileData } from "@/config/profile";
 import { cn } from "@/lib/utils";
