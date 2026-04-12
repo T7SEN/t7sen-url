@@ -19,6 +19,9 @@ Sentry.init({
       // Additional SDK configuration goes in here, for example:
       colorScheme: "system",
     }),
+    Sentry.consoleLoggingIntegration({
+      levels: ["log", "info", "warn", "error"],
+    }),
   ],
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
