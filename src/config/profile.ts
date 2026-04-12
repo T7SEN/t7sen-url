@@ -56,13 +56,13 @@ export const profileData: ProfileConfig = {
     {
       id: "discord",
       title: "Discord",
-      url: "https://discord.gg/your-invite-link",
+      url: "https://discord.com/users/170916597156937728",
       icon: Icons.discord,
     },
     {
       id: "instagram",
       title: "Instagram",
-      url: "https://instagram.com/t7sen",
+      url: "https://instagram.com/t7me.1",
       icon: Icons.instagram,
     },
     {
@@ -70,6 +70,12 @@ export const profileData: ProfileConfig = {
       title: "GitHub",
       url: "https://github.com/t7sen",
       icon: Icons.github,
+    },
+    {
+      id: "twitter",
+      title: "Twitter / X",
+      url: "https://x.com/T7ME_",
+      icon: Icons.twitter,
     },
     {
       id: "email",
