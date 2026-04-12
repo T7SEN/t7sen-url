@@ -24,15 +24,28 @@ export function TwitchCard() {
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
+  const boundsRef = React.useRef<DOMRect | null>(null);
+
+  const handleMouseEnter = React.useCallback(
+    (e: React.MouseEvent<HTMLAnchorElement>) => {
+      boundsRef.current = e.currentTarget.getBoundingClientRect();
+    },
+    [],
+  );
 
   const handleMouseMove = React.useCallback(
     (e: React.MouseEvent<HTMLAnchorElement>) => {
-      const { left, top } = e.currentTarget.getBoundingClientRect();
+      if (!boundsRef.current) return;
+      const { left, top } = boundsRef.current;
       mouseX.set(e.clientX - left);
       mouseY.set(e.clientY - top);
     },
     [mouseX, mouseY],
   );
+
+  const handleMouseLeave = React.useCallback(() => {
+    boundsRef.current = null;
+  }, []);
 
   const { data, error } = useSWR(`/api/twitch?channel=${channel}`, fetcher, {
     refreshInterval: 60000,
@@ -82,7 +95,17 @@ export function TwitchCard() {
     return (
       <div className="w-full animate-pulse">
         <div className="group relative block w-full overflow-hidden rounded-3xl border border-zinc-200/50 bg-white/60 shadow-xl dark:border-zinc-800/50 dark:bg-[#030303]">
-          <div className="h-32 w-full bg-zinc-200 dark:bg-zinc-900" />
+          <div className="relative h-32 w-full overflow-hidden bg-zinc-200 dark:bg-zinc-900">
+            <Image
+              src={profileData.bannerUrl}
+              alt={`${channel} Twitch Banner`}
+              fill
+              sizes="(max-width: 640px) 100vw, 512px"
+              className="object-cover opacity-30 grayscale dark:opacity-20"
+              priority
+              fetchPriority="high"
+            />
+          </div>
           <div className="relative -mt-5 flex flex-col items-center px-6 pb-6 text-center">
             <div className="mb-4 h-7 w-24 rounded-full bg-zinc-300 dark:bg-zinc-800" />
             <div className="flex w-full items-center justify-between gap-4">
@@ -112,7 +135,9 @@ export function TwitchCard() {
         href={`https://twitch.tv/${channel}`}
         target="_blank"
         rel="noopener noreferrer"
+        onMouseEnter={handleMouseEnter}
         onMouseMove={handleMouseMove}
+        onMouseLeave={handleMouseLeave}
         onClick={handleClick}
         className={cn(
           "group relative block w-full overflow-hidden rounded-3xl border transition-all duration-500 hover:scale-[1.02]",
@@ -135,6 +160,7 @@ export function TwitchCard() {
                 : "scale-100 opacity-30 grayscale group-hover:opacity-50 group-hover:grayscale-0 dark:opacity-20 dark:group-hover:opacity-30",
             )}
             priority
+            fetchPriority="high"
           />
           <div className="absolute inset-0 bg-linear-to-t from-white/60 via-transparent to-transparent dark:from-[#030303]" />
         </div>

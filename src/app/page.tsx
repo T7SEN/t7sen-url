@@ -1,7 +1,7 @@
 // src/app/page.tsx
 "use client";
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import dynamic from "next/dynamic";
 import { Button } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -17,19 +17,9 @@ import {
 import { MagneticWrapper } from "@/components/magnetic-wrapper";
 import { ProfileHeader } from "@/components/profile-header";
 import { PrimaryLinkCard } from "@/components/primary-link-card";
+import { TwitchCard } from "@/components/twitch-card";
 import { usePostHog } from "posthog-js/react";
 import { logger } from "@/lib/logger";
-
-// 🚀 Dynamically import heavy interactive components
-const TwitchCard = dynamic(
-  () => import("@/components/twitch-card").then((mod) => mod.TwitchCard),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="h-32 w-full animate-pulse rounded-3xl bg-zinc-200/50 dark:bg-zinc-800/50" />
-    ),
-  },
-);
 
 const SupportCard = dynamic(
   () => import("@/components/support-card").then((mod) => mod.SupportCard),
@@ -69,16 +59,27 @@ export default function Home() {
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
 
+  const boundsRef = useRef<DOMRect | null>(null);
+
   useEffect(() => {
     logger.info("User visited profile landing page", {
       tags: { page: "home" },
     });
   }, []);
 
+  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
+    boundsRef.current = e.currentTarget.getBoundingClientRect();
+  };
+
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    const { left, top } = e.currentTarget.getBoundingClientRect();
+    if (!boundsRef.current) return;
+    const { left, top } = boundsRef.current;
     mouseX.set(e.clientX - left);
     mouseY.set(e.clientY - top);
+  };
+
+  const handleMouseLeave = () => {
+    boundsRef.current = null;
   };
 
   return (
@@ -99,7 +100,9 @@ export default function Home() {
               mass: 1.2,
               delay: 0.3,
             }}
+            onMouseEnter={handleMouseEnter}
             onMouseMove={handleMouseMove}
+            onMouseLeave={handleMouseLeave}
             className="group relative flex w-full max-w-lg max-h-[85dvh] flex-col rounded-3xl border border-zinc-200/50 bg-white/40 shadow-2xl backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-950/40"
           >
             <motion.div
