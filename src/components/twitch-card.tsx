@@ -127,6 +127,7 @@ export function TwitchCard() {
             src={profileData.bannerUrl}
             alt={`${channel} Twitch Banner`}
             fill
+            sizes="(max-width: 640px) 100vw, 512px"
             className={cn(
               "object-cover transition-all duration-1000 ease-out",
               isLive
