@@ -33,7 +33,6 @@ const securityHeaders = [
 ];
 
 const nextConfig: NextConfig = {
-  output: "standalone",
   reactCompiler: true,
   images: {
     unoptimized: true,
