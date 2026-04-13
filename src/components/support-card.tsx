@@ -3,26 +3,35 @@
 
 import { m as motion } from "motion/react";
 import { usePostHog } from "posthog-js/react";
-import { profileData } from "@/config/profile";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 
-export function SupportCard() {
-  const posthog = usePostHog();
-  const support = profileData.support;
+interface SupportCardProps {
+  title: string;
+  subtitle: string;
+  url: string;
+  variant: string;
+}
 
-  if (!support) return null;
+export function SupportCard({
+  title,
+  subtitle,
+  url,
+  variant,
+}: SupportCardProps) {
+  const posthog = usePostHog();
 
   const handleClick = () => {
     if (posthog) {
       posthog.capture("support_link_clicked", {
-        support_id: support.id,
-        support_url: support.url,
+        ab_variant: variant,
+        button_text: title,
+        support_url: url,
       });
     }
 
     logger.info("Support card clicked", {
-      tags: { component: "SupportCard", supportId: support.id },
+      tags: { component: "SupportCard", variant },
     });
   };
 
@@ -34,7 +43,7 @@ export function SupportCard() {
       className="w-full"
     >
       <a
-        href={support.url}
+        href={url}
         target="_blank"
         rel="noopener noreferrer"
         onClick={handleClick}
@@ -83,7 +92,7 @@ export function SupportCard() {
 
             <div className="flex flex-col text-left">
               <h2 className="text-sm font-black uppercase tracking-[0.15em] text-zinc-900 dark:text-zinc-100">
-                {support.title}
+                {title}
               </h2>
               <p
                 className={cn(
@@ -92,7 +101,7 @@ export function SupportCard() {
                   "dark:text-[#9146FF]/70 dark:group-hover:text-[#9146FF]",
                 )}
               >
-                {support.subtitle}
+                {subtitle}
               </p>
             </div>
           </div>
