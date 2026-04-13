@@ -39,14 +39,14 @@ export const profileData: ProfileConfig = {
     id: "creators_sa",
     title: "Support the Stream",
     subtitle: "Drop a tip on Creators.sa",
-    url: "https://creators.sa/t7sen",
+    url: "/go/support",
   },
 
   links: [
     {
       id: "website",
       title: "My Site",
-      url: "https://t7sen.com",
+      url: "/go/website",
       icon: Icons.globe,
       isFeatured: true,
     },
@@ -56,25 +56,25 @@ export const profileData: ProfileConfig = {
     {
       id: "discord",
       title: "Discord",
-      url: "https://discord.com/users/170916597156937728",
+      url: "/go/discord",
       icon: Icons.discord,
     },
     {
       id: "instagram",
       title: "Instagram",
-      url: "https://instagram.com/t7me.1",
+      url: "/go/instagram",
       icon: Icons.instagram,
     },
     {
       id: "github",
       title: "GitHub",
-      url: "https://github.com/t7sen",
+      url: "/go/github",
       icon: Icons.github,
     },
     {
       id: "twitter",
       title: "Twitter / X",
-      url: "https://x.com/T7ME_",
+      url: "/go/x",
       icon: Icons.twitter,
     },
     {
