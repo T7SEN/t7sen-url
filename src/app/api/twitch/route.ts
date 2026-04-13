@@ -208,6 +208,25 @@ export async function GET(request: Request) {
       },
     );
   } catch (error: unknown) {
+    const isAbortError =
+      error &&
+      typeof error === "object" &&
+      "name" in error &&
+      error.name === "AbortError";
+
+    if (isAbortError) {
+      logger.warn(
+        "Twitch API request timed out. Gracefully defaulting to offline.",
+        {
+          tags: { route: "/api/twitch", issue: "timeout" },
+        },
+      );
+
+      // Return a 200 OK with isLive: false so the UI continues to function normally
+      return NextResponse.json({ isLive: false });
+    }
+
+    // Pass any REAL, unexpected errors (like bad credentials) to Sentry
     logger.error(error, {
       tags: { route: "/api/twitch", layer: "backend" },
     });
