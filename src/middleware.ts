@@ -32,14 +32,14 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
   const ip = request.headers.get("x-forwarded-for") || "unknown";
   const userAgent = request.headers.get("user-agent")?.toLowerCase() || "";
 
-  // 🚀 GLOBAL EXTRACTION: Extract country so all layers can utilize it
+  // 🚀 GLOBAL EXTRACTION: Extract country
   const country =
     request.headers.get("cf-ipcountry") ||
     request.headers.get("x-vercel-ip-country") ||
     "Global";
 
   // ---------------------------------------------------------
-  // LAYER 1: THE EDGE FIREWALL (Protects /api/*)
+  // LAYER 1: THE EDGE FIREWALL
   // ---------------------------------------------------------
   if (pathname.startsWith("/api/")) {
     if (BLOCKED_AGENTS.some((bot) => userAgent.includes(bot))) {
@@ -72,7 +72,7 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
   }
 
   // ---------------------------------------------------------
-  // LAYER 2: THE REDIRECT ENGINE (Handles /go/*)
+  // LAYER 2: THE REDIRECT ENGINE
   // ---------------------------------------------------------
   if (pathname.startsWith("/go/")) {
     const slug = pathname.replace("/go/", "").toLowerCase();
@@ -82,7 +82,6 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    // 🚀 Added country to Sentry/Console Logs
     console.info(
       `[Edge Redirect] Short Link Clicked: ${slug} (from ${country})`,
     );
@@ -100,7 +99,7 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
             properties: {
               slug,
               destination,
-              country, // 🚀 Added country to PostHog Analytics
+              country,
               $current_url: request.url,
               $lib: "edge-middleware",
             },
@@ -117,19 +116,35 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
   }
 
   // ---------------------------------------------------------
-  // LAYER 3: GEO-PERSONALIZATION (Injects data into React)
+  // LAYER 3 & 4: GEO-PERSONALIZATION & A/B TESTING
   // ---------------------------------------------------------
 
-  // Clone headers so we can modify them
+  // A/B Test Logic: "support_copy_test"
+  const TEST_NAME = "support_copy_test";
+  const VARIANTS = ["control", "test"]; // Control = "Support the Stream", Test = "Buy Me a Coffee"
+
+  // Read existing cookie, or randomly assign a new variant
+  let variant = request.cookies.get(TEST_NAME)?.value;
+  if (!variant || !VARIANTS.includes(variant)) {
+    variant = VARIANTS[Math.floor(Math.random() * VARIANTS.length)];
+  }
+
+  // Clone headers so we can inject our data
   const requestHeaders = new Headers(request.headers);
   requestHeaders.set("x-user-country", country);
+  requestHeaders.set("x-ab-variant", variant); // 🚀 Inject A/B Variant
 
-  // Forward the modified headers to your Next.js Server Components
-  return NextResponse.next({
+  // Create the response object
+  const response = NextResponse.next({
     request: {
       headers: requestHeaders,
     },
   });
+
+  // 🚀 Persist the variant in a cookie so the user sees the same text if they refresh the page
+  response.cookies.set(TEST_NAME, variant, { maxAge: 60 * 60 * 24 * 30 }); // Expires in 30 days
+
+  return response;
 }
 
 // =========================================================
@@ -137,7 +152,6 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
 // =========================================================
 export const config = {
   matcher: [
-    // Match all paths EXCEPT static files, images, and Next.js internals
     "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
   ],
 };
