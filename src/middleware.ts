@@ -3,7 +3,10 @@ import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
-// We define a static Map for instantaneous O(1) lookups at the Edge.
+// =========================================================
+// 1. DATA DICTIONARIES
+// =========================================================
+
 const redirectMap = new Map<string, string>([
   ["website", "https://t7sen.com"],
   ["discord", "https://discord.com/users/170916597156937728"],
@@ -15,64 +18,102 @@ const redirectMap = new Map<string, string>([
   ["email", "mailto:hello@t7sen.com"],
 ]);
 
+const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
+const WINDOW_MS = 60000; // 1 minute
+const MAX_REQUESTS = 10;
+const BLOCKED_AGENTS = ["python-requests", "curl", "postmanRuntime", "scrapy"];
+
+// =========================================================
+// 2. MIDDLEWARE ENGINE
+// =========================================================
+
 export function middleware(request: NextRequest, event: NextFetchEvent) {
   const { pathname } = request.nextUrl;
+  const ip = request.headers.get("x-forwarded-for") || "unknown";
+  const userAgent = request.headers.get("user-agent")?.toLowerCase() || "";
 
-  // 1. Safety Check: Only process /go/* routes
-  if (!pathname.startsWith("/go/")) {
-    return NextResponse.next();
+  // ---------------------------------------------------------
+  // LAYER 1: THE EDGE FIREWALL (Protects /api/*)
+  // ---------------------------------------------------------
+  if (pathname.startsWith("/api/")) {
+    if (BLOCKED_AGENTS.some((bot) => userAgent.includes(bot))) {
+      console.warn(
+        `[Edge Firewall] Blocked malicious agent: ${userAgent} from IP: ${ip}`,
+      );
+      return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    const now = Date.now();
+
+    if (rateLimitMap.size > 1000) {
+      for (const [key, value] of rateLimitMap.entries()) {
+        if (now > value.resetTime) rateLimitMap.delete(key);
+      }
+    }
+
+    const record = rateLimitMap.get(ip);
+    if (!record || now > record.resetTime) {
+      rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
+    } else if (record.count >= MAX_REQUESTS) {
+      console.warn(`[Edge Firewall] Rate Limit Exceeded: ${ip}`);
+      return NextResponse.json(
+        { error: "Too Many Requests" },
+        { status: 429, headers: { "Retry-After": "60" } },
+      );
+    } else {
+      record.count += 1;
+    }
   }
 
-  const slug = pathname.replace("/go/", "").toLowerCase();
-  const destination = redirectMap.get(slug);
+  // ---------------------------------------------------------
+  // LAYER 2: THE REDIRECT ENGINE (Handles /go/*)
+  // ---------------------------------------------------------
+  if (pathname.startsWith("/go/")) {
+    const slug = pathname.replace("/go/", "").toLowerCase();
+    const destination = redirectMap.get(slug);
 
-  // 2. Fallback: If the slug doesn't exist, redirect to the homepage
-  if (!destination) {
-    return NextResponse.redirect(new URL("/", request.url));
-  }
+    if (!destination) {
+      return NextResponse.redirect(new URL("/", request.url));
+    }
 
-  // 3. Background Logging (Bypasses Sentry Issues Feed)
-  console.info(`[Edge Redirect] Short Link Clicked: ${slug}`);
+    // Kept as console.info so it stays in Logs and doesn't spam your Issues feed
+    console.info(`[Edge Redirect] Short Link Clicked: ${slug}`);
 
-  // 4. Background Tracking: PostHog (Zero Latency Penalty)
-  const posthogToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
-
-  if (posthogToken) {
-    const ip = request.headers.get("x-forwarded-for") || "unknown";
-
-    // event.waitUntil allows the background fetch to complete AFTER the redirect is sent to the user
-    event.waitUntil(
-      fetch("https://eu.i.posthog.com/capture/", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          api_key: posthogToken,
-          // Use IP as a secure distinct_id for anonymous edge visitors
-          distinct_id: ip,
-          event: "short_link_clicked",
-          properties: {
-            slug,
-            destination,
-            $current_url: request.url,
-            $lib: "edge-middleware",
-          },
+    const posthogToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
+    if (posthogToken) {
+      event.waitUntil(
+        fetch("https://eu.i.posthog.com/capture/", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            api_key: posthogToken,
+            distinct_id: ip,
+            event: "short_link_clicked",
+            properties: {
+              slug,
+              destination,
+              $current_url: request.url,
+              $lib: "edge-middleware",
+            },
+          }),
+        }).catch((err) => {
+          // 🚀 Restored explicitly to keep your custom tags intact
+          Sentry.captureException(err, {
+            tags: { issue: "posthog_edge_fetch_failed" },
+          });
         }),
-      }).catch((err) => {
-        // Silently capture tracking failures so the user journey is never broken
-        Sentry.captureException(err, {
-          tags: { issue: "posthog_edge_fetch_failed" },
-        });
-      }),
-    );
+      );
+    }
+
+    return NextResponse.redirect(destination, 307);
   }
 
-  // 5. The Payload: Issue a 307 Temporary Redirect
-  return NextResponse.redirect(destination, 307);
+  return NextResponse.next();
 }
 
+// =========================================================
+// 3. MATCHER CONFIGURATION
+// =========================================================
 export const config = {
-  matcher: [
-    // Intercept everything starting with /go/
-    "/go/:path*",
-  ],
+  matcher: ["/go/:path*", "/api/:path*"],
 };
