@@ -3,47 +3,18 @@ import { NextResponse } from "next/server";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { logger } from "@/lib/logger";
 
+// In-memory cache for the Twitch App Access Token
 let cachedToken: string | null = null;
 let tokenExpiryTime: number = 0;
 
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const WINDOW_MS = 60000;
-const MAX_REQUESTS = 10;
-
-function checkRateLimit(ip: string): boolean {
-  const now = Date.now();
-
-  if (rateLimitMap.size > 1000) {
-    for (const [key, value] of rateLimitMap.entries()) {
-      if (now > value.resetTime) rateLimitMap.delete(key);
-    }
-  }
-
-  const record = rateLimitMap.get(ip);
-
-  if (!record || now > record.resetTime) {
-    rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
-    return true;
-  }
-
-  if (record.count >= MAX_REQUESTS) {
-    logger.warn("Rate limit exceeded", { tags: { ip, route: "/api/twitch" } });
-    return false;
-  }
-
-  record.count += 1;
-  return true;
-}
-
+// Helper: Fetch with a strict timeout to prevent Serverless hanging
 const fetchWithTimeout = async (
   url: string,
   options: RequestInit,
   timeoutMs: number = 5000,
 ): Promise<Response> => {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => {
-    controller.abort();
-  }, timeoutMs);
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
 
   try {
     const response = await fetch(url, {
@@ -58,6 +29,7 @@ const fetchWithTimeout = async (
   }
 };
 
+// Helper: Securely fetch and cache the OAuth token
 async function getTwitchAccessToken(
   clientId: string,
   clientSecret: string,
@@ -110,23 +82,10 @@ async function getTwitchAccessToken(
 
 export async function GET(request: Request) {
   try {
-    const forwardedFor = request.headers.get("x-forwarded-for");
-    const ip = forwardedFor ? forwardedFor.split(",")[0] : "unknown-ip";
-
-    if (!checkRateLimit(ip)) {
-      return NextResponse.json(
-        { error: "Too Many Requests" },
-        { status: 429, headers: { "Retry-After": "60" } },
-      );
-    }
-
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get("channel");
 
     if (!channel) {
-      logger.warn("Twitch API called without channel parameter", {
-        tags: { ip },
-      });
       return NextResponse.json(
         { error: "Channel name is required" },
         { status: 400 },
@@ -184,13 +143,18 @@ export async function GET(request: Request) {
     const streamData = await streamResponse.json();
     const isLive = Array.isArray(streamData.data) && streamData.data.length > 0;
 
+    // Background Analytics Tracking
     try {
+      const forwardedFor = request.headers.get("x-forwarded-for");
+      const ip = forwardedFor ? forwardedFor.split(",")[0] : "unknown-ip";
       const posthog = getPostHogClient();
+
       posthog.capture({
         distinctId: ip,
         event: "twitch_api_called",
         properties: { channel, is_live: isLive },
       });
+
       await posthog.shutdown();
     } catch (analyticsError: unknown) {
       logger.error(analyticsError, {
@@ -208,6 +172,7 @@ export async function GET(request: Request) {
       },
     );
   } catch (error: unknown) {
+    // 🚀 THE BULLETPROOF CHECK: Duck-typing for the AbortError
     const isAbortError =
       error &&
       typeof error === "object" &&
@@ -217,11 +182,8 @@ export async function GET(request: Request) {
     if (isAbortError) {
       logger.warn(
         "Twitch API request timed out. Gracefully defaulting to offline.",
-        {
-          tags: { route: "/api/twitch", issue: "timeout" },
-        },
+        { tags: { route: "/api/twitch", issue: "timeout" } },
       );
-
       // Return a 200 OK with isLive: false so the UI continues to function normally
       return NextResponse.json({ isLive: false });
     }
