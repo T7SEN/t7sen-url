@@ -32,6 +32,12 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
   const ip = request.headers.get("x-forwarded-for") || "unknown";
   const userAgent = request.headers.get("user-agent")?.toLowerCase() || "";
 
+  // 🚀 GLOBAL EXTRACTION: Extract country so all layers can utilize it
+  const country =
+    request.headers.get("cf-ipcountry") ||
+    request.headers.get("x-vercel-ip-country") ||
+    "Global";
+
   // ---------------------------------------------------------
   // LAYER 1: THE EDGE FIREWALL (Protects /api/*)
   // ---------------------------------------------------------
@@ -76,8 +82,10 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
       return NextResponse.redirect(new URL("/", request.url));
     }
 
-    // Kept as console.info so it stays in Logs and doesn't spam your Issues feed
-    console.info(`[Edge Redirect] Short Link Clicked: ${slug}`);
+    // 🚀 Added country to Sentry/Console Logs
+    console.info(
+      `[Edge Redirect] Short Link Clicked: ${slug} (from ${country})`,
+    );
 
     const posthogToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
     if (posthogToken) {
@@ -92,12 +100,12 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
             properties: {
               slug,
               destination,
+              country, // 🚀 Added country to PostHog Analytics
               $current_url: request.url,
               $lib: "edge-middleware",
             },
           }),
         }).catch((err) => {
-          // 🚀 Restored explicitly to keep your custom tags intact
           Sentry.captureException(err, {
             tags: { issue: "posthog_edge_fetch_failed" },
           });
@@ -108,12 +116,28 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
     return NextResponse.redirect(destination, 307);
   }
 
-  return NextResponse.next();
+  // ---------------------------------------------------------
+  // LAYER 3: GEO-PERSONALIZATION (Injects data into React)
+  // ---------------------------------------------------------
+
+  // Clone headers so we can modify them
+  const requestHeaders = new Headers(request.headers);
+  requestHeaders.set("x-user-country", country);
+
+  // Forward the modified headers to your Next.js Server Components
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 // =========================================================
 // 3. MATCHER CONFIGURATION
 // =========================================================
 export const config = {
-  matcher: ["/go/:path*", "/api/:path*"],
+  matcher: [
+    // Match all paths EXCEPT static files, images, and Next.js internals
+    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+  ],
 };
