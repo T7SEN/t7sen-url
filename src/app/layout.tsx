@@ -17,6 +17,11 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+// 🚀 Pre-encode the parameters so the URL doesn't break
+const ogTitle = encodeURIComponent(profileData.name);
+const ogSubtitle = encodeURIComponent("Portfolio & Links");
+const ogImageUrl = `/api/og?title=${ogTitle}&subtitle=${ogSubtitle}`;
+
 export const metadata: Metadata = {
   title: `${profileData.name} | Links`,
   description: profileData.bio,
@@ -28,11 +33,22 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "/",
     siteName: profileData.name,
+    // 🚀 Injecting the Dynamic Edge Image for Discord/Facebook
+    images: [
+      {
+        url: ogImageUrl,
+        width: 1200,
+        height: 630,
+        alt: `${profileData.name} Profile Preview`,
+      },
+    ],
   },
   twitter: {
     card: "summary_large_image",
     title: `${profileData.name} | Links`,
     description: profileData.bio,
+    // 🚀 Injecting the Dynamic Edge Image for X/Twitter
+    images: [ogImageUrl],
   },
 };
 
@@ -71,7 +87,6 @@ export default function RootLayout({
       <body
         className={`${spaceGrotesk.variable} ${geistMono.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
       >
-        {/* 🚀 Injecting our optimized providers */}
         <PostHogProvider>
           <ThemeProvider
             attribute="class"

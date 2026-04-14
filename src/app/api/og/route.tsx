@@ -1,18 +1,26 @@
 /* eslint-disable @next/next/no-img-element */
-// src/app/opengraph-image.tsx
+// src/app/api/og/route.tsx
 import { ImageResponse } from "next/og";
 import { profileData } from "@/config/profile";
 import { logger } from "@/lib/logger";
 
-export const alt = `${profileData.name} - ${profileData.bio}`;
-export const size = { width: 1200, height: 630 };
-export const contentType = "image/png";
+export const runtime = "edge";
 
-export const dynamic = "force-dynamic";
-
-export default async function Image() {
+export async function GET(request: Request) {
   try {
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
+    const { searchParams } = new URL(request.url);
+
+    // 🚀 Dynamic parameters (Fallback to your config if no params are passed)
+    const title = searchParams.get("title") || profileData.name;
+    const subtitle = searchParams.get("subtitle") || profileData.bio;
+
+    // 🚀 Gaming/Live parameters
+    const isLive = searchParams.get("live") === "true";
+    const game = searchParams.get("game");
+
+    // Bulletproof URL resolution for the avatar image
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
     const safeAvatarPath = profileData.avatarUrl.replace(".webp", ".png");
     const avatarSrc = new URL(safeAvatarPath, appUrl).href;
 
@@ -31,6 +39,7 @@ export default async function Image() {
           overflow: "hidden",
         }}
       >
+        {/* Cyan Glow (Top Left) */}
         <div
           style={{
             position: "absolute",
@@ -42,6 +51,7 @@ export default async function Image() {
               "radial-gradient(circle, rgba(6,182,212,0.15) 0%, rgba(0,0,0,0) 60%)",
           }}
         />
+        {/* Purple Glow (Bottom Right) */}
         <div
           style={{
             position: "absolute",
@@ -54,6 +64,7 @@ export default async function Image() {
           }}
         />
 
+        {/* Glass Container */}
         <div
           style={{
             display: "flex",
@@ -90,7 +101,7 @@ export default async function Image() {
               lineHeight: 1,
             }}
           >
-            {profileData.name}
+            {title}
           </h1>
 
           <p
@@ -104,26 +115,47 @@ export default async function Image() {
               maxWidth: "800px",
             }}
           >
-            {profileData.bio}
+            {subtitle}
           </p>
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              background: "rgba(145,70,255,0.15)",
-              border: "1px solid rgba(145,70,255,0.3)",
-              padding: "16px 32px",
-              borderRadius: "999px",
-              color: "#e9d5ff",
-              fontSize: "28px",
-              fontWeight: "700",
-              letterSpacing: "-0.01em",
-            }}
-          >
-            <span style={{ marginRight: "16px" }}>👾</span>
-            {profileData.twitchTagline}
-          </div>
+          {/* 🚀 Dynamic Status Badge */}
+          {isLive ? (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: "rgba(239, 68, 68, 0.15)", // Red tint
+                border: "1px solid rgba(239, 68, 68, 0.3)",
+                padding: "16px 32px",
+                borderRadius: "999px",
+                color: "#fca5a5", // Red text
+                fontSize: "28px",
+                fontWeight: "900",
+                letterSpacing: "0.05em",
+              }}
+            >
+              <span style={{ marginRight: "12px" }}>🔴</span>
+              {game ? `LIVE: ${game.toUpperCase()}` : "LIVE ON TWITCH"}
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                background: "rgba(145,70,255,0.15)", // Purple tint
+                border: "1px solid rgba(145,70,255,0.3)",
+                padding: "16px 32px",
+                borderRadius: "999px",
+                color: "#e9d5ff",
+                fontSize: "28px",
+                fontWeight: "700",
+                letterSpacing: "-0.01em",
+              }}
+            >
+              <span style={{ marginRight: "16px" }}>👾</span>
+              {profileData.twitchTagline}
+            </div>
+          )}
         </div>
 
         <div
@@ -142,16 +174,18 @@ export default async function Image() {
         </div>
       </div>,
       {
-        ...size,
+        width: 1200,
+        height: 630,
       },
     );
   } catch (error) {
     logger.error(error, {
-      tags: { layer: "edge", component: "OpenGraphImage" },
+      tags: { layer: "edge", component: "DynamicOGImage" },
     });
 
     return new ImageResponse(
       <div style={{ background: "#030303", width: "100%", height: "100%" }} />,
+      { width: 1200, height: 630 },
     );
   }
 }
