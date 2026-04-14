@@ -9,18 +9,39 @@ export const runtime = "edge";
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
-
-    // 🚀 Dynamic parameters (Fallback to your config if no params are passed)
     const title = searchParams.get("title") || profileData.name;
     const subtitle = searchParams.get("subtitle") || profileData.bio;
 
-    // 🚀 Gaming/Live parameters
-    const isLive = searchParams.get("live") === "true";
-    const game = searchParams.get("game");
-
-    // Bulletproof URL resolution for the avatar image
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
+
+    // 🚀 THE AUTONOMOUS ENGINE: Fetch your own API to check Twitch status
+    let isLive = false;
+    let game = null;
+
+    try {
+      // We pass the channel from your config.
+      // next: { revalidate: 60 } ensures the Edge caches this so we don't spam Twitch.
+      const twitchRes = await fetch(
+        `${appUrl}/api/twitch?channel=${profileData.twitchChannel}`,
+        {
+          next: { revalidate: 60 },
+        },
+      );
+
+      if (twitchRes.ok) {
+        const data = await twitchRes.json();
+        isLive = data.isLive;
+        game = data.game;
+      }
+    } catch (err: unknown) {
+      // 🚀 Now 'err' is used by passing it into the logger payload!
+      logger.warn("OG Route failed to autonomously fetch Twitch status", {
+        error: err,
+        tags: { layer: "edge" },
+      });
+    }
+
     const safeAvatarPath = profileData.avatarUrl.replace(".webp", ".png");
     const avatarSrc = new URL(safeAvatarPath, appUrl).href;
 
@@ -39,7 +60,7 @@ export async function GET(request: Request) {
           overflow: "hidden",
         }}
       >
-        {/* Cyan Glow (Top Left) */}
+        {/* Cyan Glow */}
         <div
           style={{
             position: "absolute",
@@ -51,7 +72,7 @@ export async function GET(request: Request) {
               "radial-gradient(circle, rgba(6,182,212,0.15) 0%, rgba(0,0,0,0) 60%)",
           }}
         />
-        {/* Purple Glow (Bottom Right) */}
+        {/* Purple Glow */}
         <div
           style={{
             position: "absolute",
@@ -64,7 +85,6 @@ export async function GET(request: Request) {
           }}
         />
 
-        {/* Glass Container */}
         <div
           style={{
             display: "flex",
@@ -124,11 +144,11 @@ export async function GET(request: Request) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                background: "rgba(239, 68, 68, 0.15)", // Red tint
+                background: "rgba(239, 68, 68, 0.15)",
                 border: "1px solid rgba(239, 68, 68, 0.3)",
                 padding: "16px 32px",
                 borderRadius: "999px",
-                color: "#fca5a5", // Red text
+                color: "#fca5a5",
                 fontSize: "28px",
                 fontWeight: "900",
                 letterSpacing: "0.05em",
@@ -142,7 +162,7 @@ export async function GET(request: Request) {
               style={{
                 display: "flex",
                 alignItems: "center",
-                background: "rgba(145,70,255,0.15)", // Purple tint
+                background: "rgba(145,70,255,0.15)",
                 border: "1px solid rgba(145,70,255,0.3)",
                 padding: "16px 32px",
                 borderRadius: "999px",
@@ -173,16 +193,12 @@ export async function GET(request: Request) {
           {appUrl.replace("https://", "").replace("http://", "")}
         </div>
       </div>,
-      {
-        width: 1200,
-        height: 630,
-      },
+      { width: 1200, height: 630 },
     );
   } catch (error) {
     logger.error(error, {
       tags: { layer: "edge", component: "DynamicOGImage" },
     });
-
     return new ImageResponse(
       <div style={{ background: "#030303", width: "100%", height: "100%" }} />,
       { width: 1200, height: 630 },

@@ -141,7 +141,14 @@ export async function GET(request: Request) {
     }
 
     const streamData = await streamResponse.json();
-    const isLive = Array.isArray(streamData.data) && streamData.data.length > 0;
+
+    // 🚀 THE UPGRADE: Extract the actual stream object to get the game name
+    const stream =
+      Array.isArray(streamData.data) && streamData.data.length > 0
+        ? streamData.data[0]
+        : null;
+    const isLive = !!stream;
+    const game = stream ? stream.game_name : null;
 
     // Background Analytics Tracking
     try {
@@ -152,7 +159,8 @@ export async function GET(request: Request) {
       posthog.capture({
         distinctId: ip,
         event: "twitch_api_called",
-        properties: { channel, is_live: isLive },
+        // 🚀 Track the game in PostHog
+        properties: { channel, is_live: isLive, game },
       });
 
       await posthog.shutdown();
@@ -162,8 +170,9 @@ export async function GET(request: Request) {
       });
     }
 
+    // 🚀 Return BOTH the live status and the game
     return NextResponse.json(
-      { isLive },
+      { isLive, game },
       {
         status: 200,
         headers: {
