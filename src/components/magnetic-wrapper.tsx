@@ -1,7 +1,7 @@
 // src/components/magnetic-wrapper.tsx
 "use client";
 
-import React, { useRef } from "react";
+import * as React from "react";
 import { m as motion, useMotionValue, useSpring } from "motion/react";
 
 interface MagneticWrapperProps {
@@ -13,8 +13,8 @@ export function MagneticWrapper({
   children,
   className = "",
 }: MagneticWrapperProps) {
-  const ref = useRef<HTMLDivElement>(null);
-  const boundsRef = useRef<DOMRect | null>(null);
+  const ref = React.useRef<HTMLDivElement>(null);
+  const boundsRef = React.useRef<DOMRect | null>(null);
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -23,9 +23,10 @@ export function MagneticWrapper({
   const springX = useSpring(x, springConfig);
   const springY = useSpring(y, springConfig);
 
+  // 🚀 React Compiler automatically memoizes these handlers at build time
   const handleMouseEnter = () => {
     if (ref.current) {
-      // Cache geometry once on enter
+      // Cache geometry once on enter to prevent layout thrashing
       boundsRef.current = ref.current.getBoundingClientRect();
     }
   };
@@ -57,7 +58,11 @@ export function MagneticWrapper({
       onMouseEnter={handleMouseEnter}
       onMouseMove={handleMouseMove}
       onMouseLeave={handleMouseLeave}
-      style={{ x: springX, y: springY }}
+      style={{
+        x: springX,
+        y: springY,
+        willChange: "transform",
+      }}
       className={className}
     >
       {children}
