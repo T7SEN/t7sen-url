@@ -1,4 +1,6 @@
+// src/components/ui/spotlight-new.tsx
 "use client";
+
 import { m as motion } from "motion/react";
 
 type SpotlightProps = {
@@ -26,28 +28,22 @@ export const Spotlight = ({
 }: SpotlightProps = {}) => {
   return (
     <motion.div
-      initial={{
-        opacity: 0,
-      }}
-      animate={{
-        opacity: 1,
-      }}
-      transition={{
-        duration: 1.5,
-      }}
-      className="pointer-events-none absolute inset-0 h-full w-full"
+      initial={{ opacity: 0 }}
+      animate={{ opacity: 1 }}
+      transition={{ duration: 1.5 }}
+      className="pointer-events-none absolute inset-0 h-full w-full overflow-hidden"
     >
       <motion.div
-        animate={{
-          x: [0, xOffset, 0],
-        }}
+        animate={{ x: [0, xOffset, 0] }}
         transition={{
           duration,
           repeat: Infinity,
           repeatType: "reverse",
           ease: "easeInOut",
         }}
-        className="absolute top-0 left-0 w-screen h-screen z-40 pointer-events-none"
+        // 🚀 Strictly enforce GPU hardware acceleration on the moving container
+        style={{ willChange: "transform" }}
+        className="pointer-events-none absolute left-0 top-0 z-40 h-screen w-screen"
       >
         <div
           style={{
@@ -56,7 +52,7 @@ export const Spotlight = ({
             width: `${width}px`,
             height: `${height}px`,
           }}
-          className={`absolute top-0 left-0`}
+          className="absolute left-0 top-0"
         />
 
         <div
@@ -66,7 +62,7 @@ export const Spotlight = ({
             width: `${smallWidth}px`,
             height: `${height}px`,
           }}
-          className={`absolute top-0 left-0 origin-top-left`}
+          className="absolute left-0 top-0 origin-top-left"
         />
 
         <div
@@ -76,21 +72,21 @@ export const Spotlight = ({
             width: `${smallWidth}px`,
             height: `${height}px`,
           }}
-          className={`absolute top-0 left-0 origin-top-left`}
+          className="absolute left-0 top-0 origin-top-left"
         />
       </motion.div>
 
       <motion.div
-        animate={{
-          x: [0, -xOffset, 0],
-        }}
+        animate={{ x: [0, -xOffset, 0] }}
         transition={{
           duration,
           repeat: Infinity,
           repeatType: "reverse",
           ease: "easeInOut",
         }}
-        className="absolute top-0 right-0 w-screen h-screen z-40 pointer-events-none"
+        // 🚀 Strictly enforce GPU hardware acceleration on the moving container
+        style={{ willChange: "transform" }}
+        className="pointer-events-none absolute right-0 top-0 z-40 h-screen w-screen"
       >
         <div
           style={{
@@ -99,7 +95,7 @@ export const Spotlight = ({
             width: `${width}px`,
             height: `${height}px`,
           }}
-          className={`absolute top-0 right-0`}
+          className="absolute right-0 top-0"
         />
 
         <div
@@ -109,7 +105,7 @@ export const Spotlight = ({
             width: `${smallWidth}px`,
             height: `${height}px`,
           }}
-          className={`absolute top-0 right-0 origin-top-right`}
+          className="absolute right-0 top-0 origin-top-right"
         />
 
         <div
@@ -119,7 +115,7 @@ export const Spotlight = ({
             width: `${smallWidth}px`,
             height: `${height}px`,
           }}
-          className={`absolute top-0 right-0 origin-top-right`}
+          className="absolute right-0 top-0 origin-top-right"
         />
       </motion.div>
     </motion.div>
