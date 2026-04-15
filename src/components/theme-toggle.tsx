@@ -11,67 +11,59 @@ import { logger } from "@/lib/logger";
 export function ThemeToggle() {
   const { theme, setTheme } = useTheme();
 
-  const toggleTheme = React.useCallback(
-    (e: React.MouseEvent) => {
-      const newTheme = theme === "light" ? "dark" : "light";
-      const isDark = theme === "dark";
+  // 🚀 useCallback removed: React Compiler handles this automatically
+  const toggleTheme = (e: React.MouseEvent) => {
+    const newTheme = theme === "light" ? "dark" : "light";
+    const isDark = theme === "dark";
 
-      // 🚀 Telemetry and logging strictly preserved
-      posthog.capture("theme_toggled", { theme: newTheme });
+    posthog.capture("theme_toggled", { theme: newTheme });
 
-      logger.info("User toggled application theme", {
-        tags: { component: "ThemeToggle" },
-        extra: { previousTheme: theme, newTheme },
+    logger.info("User toggled application theme", {
+      tags: { component: "ThemeToggle" },
+      extra: { previousTheme: theme, newTheme },
+    });
+
+    if (!document.startViewTransition) {
+      setTheme(newTheme);
+      return;
+    }
+
+    const x = e.clientX;
+    const y = e.clientY;
+    const endRadius = Math.hypot(
+      Math.max(x, window.innerWidth - x),
+      Math.max(y, window.innerHeight - y),
+    );
+
+    const transition = document.startViewTransition(() => {
+      setTheme(newTheme);
+    });
+
+    transition.ready
+      .then(() => {
+        const clipPath = [
+          `circle(0px at ${x}px ${y}px)`,
+          `circle(${endRadius}px at ${x}px ${y}px)`,
+        ];
+
+        document.documentElement.animate(
+          {
+            clipPath: isDark ? [...clipPath].reverse() : clipPath,
+          },
+          {
+            duration: 500,
+            easing: "ease-in-out",
+            pseudoElement: isDark
+              ? "::view-transition-old(root)"
+              : "::view-transition-new(root)",
+            fill: "forwards",
+          },
+        );
+      })
+      .catch((err) => {
+        logger.error("View transition failed", { extra: { error: err } });
       });
-
-      // Fallback for browsers that do not support View Transitions yet
-      if (!document.startViewTransition) {
-        setTheme(newTheme);
-        return;
-      }
-
-      // Calculate click coordinates and maximum radius needed
-      const x = e.clientX;
-      const y = e.clientY;
-      const endRadius = Math.hypot(
-        Math.max(x, window.innerWidth - x),
-        Math.max(y, window.innerHeight - y),
-      );
-
-      // Freeze the DOM and prepare the transition
-      const transition = document.startViewTransition(() => {
-        setTheme(newTheme);
-      });
-
-      // Animate the clip-path once the new theme is applied
-      transition.ready
-        .then(() => {
-          const clipPath = [
-            `circle(0px at ${x}px ${y}px)`,
-            `circle(${endRadius}px at ${x}px ${y}px)`,
-          ];
-
-          document.documentElement.animate(
-            {
-              clipPath: isDark ? [...clipPath].reverse() : clipPath,
-            },
-            {
-              duration: 500,
-              easing: "ease-in-out",
-              pseudoElement: isDark
-                ? "::view-transition-old(root)"
-                : "::view-transition-new(root)",
-              // 🚀 Prevents the 1-frame snap-back by holding the final clip-path state
-              fill: "forwards",
-            },
-          );
-        })
-        .catch((err) => {
-          logger.error("View transition failed", { extra: { error: err } });
-        });
-    },
-    [theme, setTheme],
-  );
+  };
 
   return (
     <Button

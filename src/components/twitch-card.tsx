@@ -19,7 +19,6 @@ import { logger } from "@/lib/logger";
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function TwitchCard() {
-  // ... (Keep your exact component logic here, SWR, PostHog, hover handlers, etc.)
   const posthog = usePostHog();
   const channel = profileData.twitchChannel;
 
@@ -27,26 +26,21 @@ export function TwitchCard() {
   const mouseY = useMotionValue(0);
   const boundsRef = React.useRef<DOMRect | null>(null);
 
-  const handleMouseEnter = React.useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      boundsRef.current = e.currentTarget.getBoundingClientRect();
-    },
-    [],
-  );
+  // 🚀 useCallback removed: React Compiler handles these automatically
+  const handleMouseEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    boundsRef.current = e.currentTarget.getBoundingClientRect();
+  };
 
-  const handleMouseMove = React.useCallback(
-    (e: React.MouseEvent<HTMLAnchorElement>) => {
-      if (!boundsRef.current) return;
-      const { left, top } = boundsRef.current;
-      mouseX.set(e.clientX - left);
-      mouseY.set(e.clientY - top);
-    },
-    [mouseX, mouseY],
-  );
+  const handleMouseMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
+    if (!boundsRef.current) return;
+    const { left, top } = boundsRef.current;
+    mouseX.set(e.clientX - left);
+    mouseY.set(e.clientY - top);
+  };
 
-  const handleMouseLeave = React.useCallback(() => {
+  const handleMouseLeave = () => {
     boundsRef.current = null;
-  }, []);
+  };
 
   const { data, error } = useSWR(`/api/twitch?channel=${channel}`, fetcher, {
     refreshInterval: 60000,
@@ -127,7 +121,6 @@ export function TwitchCard() {
   }
 
   return (
-    // 🚀 Added delay-500 to cascade after the profile header
     <div className="w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700">
       <a
         href={`https://twitch.tv/${channel}`}
@@ -145,7 +138,6 @@ export function TwitchCard() {
             : "border-zinc-200/50 bg-white/60 shadow-xl hover:border-zinc-300 hover:shadow-2xl dark:border-zinc-800/50 dark:bg-[#030303] dark:hover:border-zinc-700",
         )}
       >
-        {/* Image and internal card content remains exactly the same */}
         <div className="relative h-32 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-950">
           <Image
             src={profileData.bannerUrl}
