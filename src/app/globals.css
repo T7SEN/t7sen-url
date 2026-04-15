@@ -149,3 +149,28 @@
     }
   }
 }
+
+@layer base {
+  /* 🚀 Disable the default browser cross-fade for the root transition 
+		so our JS-driven clip-path animation runs cleanly.
+	*/
+  ::view-transition-old(root),
+  ::view-transition-new(root) {
+    animation: none;
+    mix-blend-mode: normal;
+  }
+
+  /* Ensure the dark mode snapshot always sits on top during the animation */
+  .dark::view-transition-old(root) {
+    z-index: 1;
+  }
+  .dark::view-transition-new(root) {
+    z-index: 999;
+  }
+  ::view-transition-old(root) {
+    z-index: 999;
+  }
+  ::view-transition-new(root) {
+    z-index: 1;
+  }
+}
