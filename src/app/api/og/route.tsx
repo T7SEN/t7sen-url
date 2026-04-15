@@ -4,8 +4,6 @@ import { ImageResponse } from "next/og";
 import { profileData } from "@/config/profile";
 import { logger } from "@/lib/logger";
 
-export const runtime = "edge";
-
 export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
@@ -15,7 +13,7 @@ export async function GET(request: Request) {
     const appUrl =
       process.env.NEXT_PUBLIC_APP_URL || new URL(request.url).origin;
 
-    // 🚀 THE AUTONOMOUS ENGINE: Fetch your own API to check Twitch status
+    // THE AUTONOMOUS ENGINE: Fetch your own API to check Twitch status
     let isLive = false;
     let game = null;
 
@@ -35,7 +33,6 @@ export async function GET(request: Request) {
         game = data.game;
       }
     } catch (err: unknown) {
-      // 🚀 Now 'err' is used by passing it into the logger payload!
       logger.warn("OG Route failed to autonomously fetch Twitch status", {
         error: err,
         tags: { layer: "edge" },
@@ -138,7 +135,7 @@ export async function GET(request: Request) {
             {subtitle}
           </p>
 
-          {/* 🚀 Dynamic Status Badge */}
+          {/* Dynamic Status Badge */}
           {isLive ? (
             <div
               style={{
@@ -199,6 +196,7 @@ export async function GET(request: Request) {
     logger.error(error, {
       tags: { layer: "edge", component: "DynamicOGImage" },
     });
+
     return new ImageResponse(
       <div style={{ background: "#030303", width: "100%", height: "100%" }} />,
       { width: 1200, height: 630 },
