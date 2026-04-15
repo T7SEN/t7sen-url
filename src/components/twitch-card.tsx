@@ -19,6 +19,7 @@ import { logger } from "@/lib/logger";
 const fetcher = (url: string) => fetch(url).then((res) => res.json());
 
 export function TwitchCard() {
+  // ... (Keep your exact component logic here, SWR, PostHog, hover handlers, etc.)
   const posthog = usePostHog();
   const channel = profileData.twitchChannel;
 
@@ -125,12 +126,8 @@ export function TwitchCard() {
   }
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.1, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full"
-    >
+    // 🚀 Added delay-500 to cascade after the profile header
+    <div className="w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700">
       <a
         href={`https://twitch.tv/${channel}`}
         target="_blank"
@@ -147,6 +144,7 @@ export function TwitchCard() {
             : "border-zinc-200/50 bg-white/60 shadow-xl hover:border-zinc-300 hover:shadow-2xl dark:border-zinc-800/50 dark:bg-[#030303] dark:hover:border-zinc-700",
         )}
       >
+        {/* Image and internal card content remains exactly the same */}
         <div className="relative h-32 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-950">
           <Image
             src={profileData.bannerUrl}
@@ -252,6 +250,6 @@ export function TwitchCard() {
           </div>
         </div>
       </a>
-    </motion.div>
+    </div>
   );
 }

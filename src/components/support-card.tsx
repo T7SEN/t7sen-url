@@ -1,7 +1,6 @@
 // src/components/support-card.tsx
 "use client";
 
-import { m as motion } from "motion/react";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
@@ -36,12 +35,8 @@ export function SupportCard({
   };
 
   return (
-    <motion.div
-      initial={{ opacity: 0, y: 15 }}
-      animate={{ opacity: 1, y: 0 }}
-      transition={{ duration: 0.6, delay: 0.8, ease: [0.16, 1, 0.3, 1] }}
-      className="w-full"
-    >
+    // 🚀 Added delay-700 so it loads just after the Primary links
+    <div className="w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-700 duration-700">
       <a
         href={url}
         target="_blank"
@@ -131,6 +126,6 @@ export function SupportCard({
           </div>
         </div>
       </a>
-    </motion.div>
+    </div>
   );
 }

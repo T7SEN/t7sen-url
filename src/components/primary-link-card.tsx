@@ -37,7 +37,9 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
         rel="noopener noreferrer"
         onClick={handleClick}
         className={cn(
-          "group relative flex w-full items-center justify-center overflow-hidden rounded-[20px] px-6 py-5 shadow-xl transition-all duration-500 hover:scale-[1.02]",
+          // 🚀 Swapped scroll-reveal for pure CSS animate-in
+          "animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700",
+          "group relative flex w-full items-center justify-center overflow-hidden rounded-[20px] px-6 py-5 shadow-xl transition-all hover:scale-[1.02]",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           "bg-white/80 border border-zinc-200/50",
           "dark:bg-[#030303] dark:border-transparent",
@@ -102,7 +104,8 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
       target="_blank"
       rel="noopener noreferrer"
       onClick={handleClick}
-      className="flex w-full items-center gap-3 rounded-xl border border-zinc-200/50 bg-white/40 p-4 transition-all hover:scale-[1.02] hover:border-zinc-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-zinc-800/50 dark:bg-zinc-950/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:focus-visible:ring-offset-zinc-950"
+      // 🚀 Swapped scroll-reveal for pure CSS animate-in
+      className="animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700 flex w-full items-center gap-3 rounded-xl border border-zinc-200/50 bg-white/40 p-4 transition-all hover:scale-[1.02] hover:border-zinc-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-zinc-800/50 dark:bg-zinc-950/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:focus-visible:ring-offset-zinc-950"
     >
       <Icon className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
       <span className="font-medium text-zinc-800 dark:text-zinc-200">
