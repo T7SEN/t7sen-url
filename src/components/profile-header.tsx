@@ -12,12 +12,13 @@ export function ProfileHeader() {
           <span className="absolute text-xl font-bold text-zinc-500 dark:text-zinc-400">
             {userInitials}
           </span>
-          {/* 🚀 Next.js Image with 'priority' forces instant LCP loading */}
           <Image
             src={profileData.avatarUrl}
             alt={`${profileData.name} avatar`}
             fill
             priority
+            fetchPriority="high"
+            decoding="async"
             sizes="96px"
             className="object-cover relative z-10"
           />
