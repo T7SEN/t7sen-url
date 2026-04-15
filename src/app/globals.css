@@ -128,3 +128,24 @@
     @apply font-sans;
   }
 }
+
+@layer utilities {
+  /* 🚀 Native GPU Scroll Reveal */
+  .scroll-reveal {
+    animation: fade-in-up linear both;
+    animation-timeline: view();
+    /* Starts animating when element is 10% into view, finishes when 30% in view */
+    animation-range: entry 10% cover 30%;
+  }
+
+  @keyframes fade-in-up {
+    from {
+      opacity: 0;
+      transform: translateY(30px) scale(0.95);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+}
