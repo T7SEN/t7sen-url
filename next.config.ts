@@ -2,6 +2,21 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+const csp = [
+  "default-src 'self'",
+  "script-src 'self' 'unsafe-eval' 'unsafe-inline' " +
+    "https://eu.i.posthog.com https://eu-assets.i.posthog.com",
+  "worker-src 'self' blob:",
+  "style-src 'self' 'unsafe-inline'",
+  "img-src 'self' blob: data: https:",
+  "font-src 'self' data:",
+  "object-src 'none'",
+  "base-uri 'self'",
+  "frame-ancestors 'none'",
+  "connect-src 'self' https://eu.i.posthog.com " +
+    "https://eu-assets.i.posthog.com",
+].join("; ");
+
 const securityHeaders = [
   {
     key: "X-DNS-Prefetch-Control",
@@ -25,22 +40,32 @@ const securityHeaders = [
   },
   {
     key: "Content-Security-Policy",
-    value:
-      "default-src 'self'; script-src 'self' 'unsafe-eval' 'unsafe-inline' https://eu.i.posthog.com https://eu-assets.i.posthog.com; worker-src 'self' blob:; style-src 'self' 'unsafe-inline'; img-src 'self' blob: data: https:; font-src 'self' data:; object-src 'none'; base-uri 'self'; frame-ancestors 'none'; connect-src 'self' https://eu.i.posthog.com https://eu-assets.i.posthog.com;",
+    value: csp,
   },
 ];
 
 const nextConfig: NextConfig = {
+  // 🚀 React Compiler is STABLE (Automatic memoization)
   reactCompiler: true,
+
+  // 🚀 Cache Components is STABLE (The evolution of PPR)
+  cacheComponents: true,
+
+  // 🚀 DigitalOcean optimization: Disable built-in image resizing
+  images: {
+    unoptimized: true,
+  },
+
   experimental: {
-    optimizeCss: true,
     optimizePackageImports: [
       "lucide-react",
       "motion/react",
       "posthog-js",
       "@sentry/nextjs",
     ],
+    optimizeCss: true,
   },
+
   async headers() {
     return [
       {
@@ -49,6 +74,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
   async rewrites() {
     return [
       {
@@ -61,6 +87,7 @@ const nextConfig: NextConfig = {
       },
     ];
   },
+
   skipTrailingSlashRedirect: true,
 };
 
