@@ -101,6 +101,7 @@ export function TwitchCard() {
               src={profileData.bannerUrl}
               alt={`${channel} Twitch Banner`}
               fill
+              decoding="async"
               sizes="(max-width: 640px) 100vw, 512px"
               className="object-cover opacity-30 grayscale dark:opacity-20"
               priority
@@ -150,6 +151,7 @@ export function TwitchCard() {
             src={profileData.bannerUrl}
             alt={`${channel} Twitch Banner`}
             fill
+            decoding="async"
             sizes="(max-width: 640px) 100vw, 512px"
             className={cn(
               "object-cover transition-all duration-1000 ease-out",
