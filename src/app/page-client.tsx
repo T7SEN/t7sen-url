@@ -41,10 +41,11 @@ const itemVariants: Variants = {
 // 🚀 Accept the A/B variant as a prop from the Server Component
 export default function PageClient({
   supportVariant,
+  currentYear,
 }: {
   supportVariant: string;
+  currentYear: number;
 }) {
-  const currentYear = new Date().getFullYear();
   const posthog = usePostHog();
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
@@ -234,9 +235,12 @@ export default function PageClient({
         >
           <span>© {currentYear}</span>
           <span>•</span>
-          <span>Made by T7SEN with</span>
-          <span className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
-            💜
+          <span>
+            Made with{" "}
+            <span className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
+              💜{" "}
+            </span>
+            by T7SEN
           </span>
         </motion.footer>
       </main>
