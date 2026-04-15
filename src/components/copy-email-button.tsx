@@ -26,6 +26,7 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
       await navigator.clipboard.writeText(emailAddress);
       setCopied(true);
 
+      // 🚀 Telemetry strictly preserved
       if (posthog) {
         posthog.capture("social_link_clicked", {
           social_id: id,
@@ -38,6 +39,7 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
         tags: { component: "CopyEmailButton", socialId: id },
       });
 
+      // Reset after 2 seconds
       setTimeout(() => {
         setCopied(false);
       }, 2000);
@@ -51,29 +53,45 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
   return (
     <button
       onClick={handleCopy}
+      // 🚀 Button width is strictly locked to w-10/w-12 to prevent any layout shifts
       className={cn(
-        "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border border-transparent bg-transparent transition-all hover:scale-110 sm:h-12 sm:w-12",
+        "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition-all sm:h-12 sm:w-12",
         "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
-        "text-zinc-500 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm",
-        "dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50",
+        copied
+          ? // Success State (Green Border/Icon)
+            "scale-110 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 shadow-inner dark:bg-emerald-500/20 dark:text-emerald-400"
+          : // Default State
+            "border-transparent bg-transparent text-zinc-500 hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50",
       )}
       title={copied ? "Email Copied!" : title}
       aria-label={title}
     >
+      {/* 🚀 The Floating "Copied!" Badge (Absolutely positioned to prevent layout shift) */}
+      <AnimatePresence>
+        {copied && (
+          <motion.div
+            initial={{ opacity: 0, y: 10, scale: 0.8 }}
+            animate={{ opacity: 1, y: -45, scale: 1 }}
+            exit={{ opacity: 0, y: -40, scale: 0.8 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="pointer-events-none absolute left-1/2 flex -translate-x-1/2 items-center whitespace-nowrap rounded-md bg-zinc-900 px-3 py-1.5 text-xs font-semibold text-zinc-50 shadow-lg dark:bg-zinc-50 dark:text-zinc-900"
+          >
+            Copied!
+            {/* CSS Triangle pointing down to the button */}
+            <div className="absolute -bottom-1 left-1/2 h-2.5 w-2.5 -translate-x-1/2 rotate-45 bg-zinc-900 dark:bg-zinc-50" />
+          </motion.div>
+        )}
+      </AnimatePresence>
+
+      {/* The Icon Swap Engine */}
       <AnimatePresence mode="wait" initial={false}>
         {copied ? (
           <motion.div
             key="check"
-            initial={{ scale: 0, opacity: 0, rotate: -180 }}
+            initial={{ scale: 0.5, opacity: 0, rotate: -90 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
-            exit={{ scale: 0, opacity: 0, rotate: 180 }}
-            transition={{
-              duration: 0.2,
-              type: "spring",
-              stiffness: 200,
-              damping: 10,
-            }}
-            className="text-emerald-500 dark:text-emerald-400"
+            exit={{ scale: 0.5, opacity: 0, rotate: 90 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
           >
             <svg
               width="18"
@@ -91,10 +109,10 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
         ) : (
           <motion.div
             key="mail"
-            initial={{ scale: 0, opacity: 0, rotate: 180 }}
+            initial={{ scale: 0.5, opacity: 0, rotate: 90 }}
             animate={{ scale: 1, opacity: 1, rotate: 0 }}
-            exit={{ scale: 0, opacity: 0, rotate: -180 }}
-            transition={{ duration: 0.2 }}
+            exit={{ scale: 0.5, opacity: 0, rotate: -90 }}
+            transition={{ duration: 0.15, ease: "easeOut" }}
           >
             <Icons.mail className="h-4 w-4 sm:h-5 sm:w-5" aria-hidden="true" />
           </motion.div>
