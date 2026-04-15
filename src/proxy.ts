@@ -1,4 +1,4 @@
-// src/middleware.ts
+// src/proxy.ts
 import { NextResponse } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import * as Sentry from "@sentry/nextjs";
@@ -24,10 +24,10 @@ const MAX_REQUESTS = 10;
 const BLOCKED_AGENTS = ["python-requests", "curl", "postmanRuntime", "scrapy"];
 
 // =========================================================
-// 2. MIDDLEWARE ENGINE
+// 2. proxy ENGINE
 // =========================================================
 
-export function middleware(request: NextRequest, event: NextFetchEvent) {
+export function proxy(request: NextRequest, event: NextFetchEvent) {
   const { pathname } = request.nextUrl;
   const ip = request.headers.get("x-forwarded-for") || "unknown";
   const userAgent = request.headers.get("user-agent")?.toLowerCase() || "";
@@ -101,7 +101,7 @@ export function middleware(request: NextRequest, event: NextFetchEvent) {
               destination,
               country,
               $current_url: request.url,
-              $lib: "edge-middleware",
+              $lib: "edge-proxy",
             },
           }),
         }).catch((err) => {
