@@ -20,6 +20,7 @@ import { TwitchCard } from "@/components/twitch-card";
 import { SupportCard } from "@/components/support-card"; // 🚀 Removed dynamic ssr:false import
 import { usePostHog } from "posthog-js/react";
 import { logger } from "@/lib/logger";
+import { ShareProfileButton } from "@/components/share-profile-button";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -89,6 +90,15 @@ export default function PageClient({
         <div className="absolute right-4 top-4 z-50">
           <ThemeToggle />
         </div>
+
+        <motion.div
+          initial={{ opacity: 0, scale: 0.8, x: -20 }}
+          animate={{ opacity: 1, scale: 1, x: 0 }}
+          transition={{ delay: 1.5, duration: 0.5, type: "spring" }}
+          className="absolute bottom-4 left-4 z-50"
+        >
+          <ShareProfileButton />
+        </motion.div>
 
         <div className="z-10 flex w-full max-w-lg flex-col gap-4">
           <motion.div
