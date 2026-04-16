@@ -5,6 +5,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 import { MotionProvider } from "@/components/motion-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { profileData } from "@/config/profile";
+import { JsonLd } from "@/components/json-ld";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -17,7 +18,6 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
-// 🚀 Pre-encode the parameters so the URL doesn't break
 const ogTitle = encodeURIComponent(profileData.name);
 const ogSubtitle = encodeURIComponent("Portfolio & Links");
 const ogImageUrl = `/api/og?title=${ogTitle}&subtitle=${ogSubtitle}`;
@@ -33,7 +33,6 @@ export const metadata: Metadata = {
     locale: "en_US",
     url: "/",
     siteName: profileData.name,
-    // 🚀 Injecting the Dynamic Edge Image for Discord/Facebook
     images: [
       {
         url: ogImageUrl,
@@ -47,7 +46,6 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: `${profileData.name} | Links`,
     description: profileData.bio,
-    // 🚀 Injecting the Dynamic Edge Image for X/Twitter
     images: [ogImageUrl],
   },
 };
@@ -57,32 +55,10 @@ export default function RootLayout({
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000";
-
-  const jsonLd = {
-    "@context": "https://schema.org",
-    "@type": "ProfilePage",
-    mainEntity: {
-      "@type": "Person",
-      name: profileData.name,
-      alternateName: profileData.twitchChannel,
-      description: profileData.bio,
-      image: `${appUrl}${profileData.avatarUrl}`,
-      sameAs: [
-        `https://twitch.tv/${profileData.twitchChannel}`,
-        ...profileData.socials.map((social) => social.url),
-        ...profileData.links.map((link) => link.url),
-      ].filter((url) => !url.startsWith("mailto:")),
-    },
-  };
-
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
-        <script
-          type="application/ld+json"
-          dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
-        />
+        <JsonLd />
       </head>
       <body
         className={`${spaceGrotesk.variable} ${geistMono.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
