@@ -2,6 +2,7 @@
 import { NextResponse, userAgent as parseUserAgent } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { profileData } from "@/config/profile";
 import { flushSentry, flushSentryAfterResponse } from "@/lib/sentry-flush";
 import {
   posthogCookieName,
@@ -80,6 +81,19 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
         `[Edge Firewall] Blocked malicious agent: ${userAgent} from IP: ${ip}`,
       );
       return new NextResponse("Forbidden", { status: 403 });
+    }
+
+    // The TwitchCard's exact poll URL skips the per-IP budget: visitors sharing
+    // one IP (NAT, carrier CGNAT) all poll it every minute, and an 11th tab got
+    // a 429. That URL is CDN-cached for 60 s and src/lib/twitch.ts memoises
+    // Helix for 30 s, so the budget protected little. Any other query (extra
+    // or reordered params, other casing) misses the CDN cache, so it keeps the
+    // budget.
+    if (
+      pathname === "/api/twitch" &&
+      request.nextUrl.search === `?channel=${profileData.twitchChannel}`
+    ) {
+      return NextResponse.next();
     }
 
     const now = Date.now();
@@ -165,13 +179,24 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
               ...serverEventProperties(identity),
             },
           }),
-        }).catch((err) => {
-          Sentry.captureException(err, {
-            tags: { issue: "posthog_edge_fetch_failed" },
-          });
-          // Captured after the response-time flush may have run: flush again
-          return flushSentry();
-        }),
+        })
+          .then((res) => {
+            // fetch only rejects on network errors; an HTTP error (PostHog
+            // 5xx or 429) also loses the event
+            if (res.ok) return;
+            Sentry.captureMessage(`PostHog capture responded ${res.status}`, {
+              level: "warning",
+              tags: { issue: "posthog_edge_fetch_failed" },
+            });
+            // Captured after the response-time flush may have run: flush again
+            return flushSentry();
+          })
+          .catch((err) => {
+            Sentry.captureException(err, {
+              tags: { issue: "posthog_edge_fetch_failed" },
+            });
+            return flushSentry();
+          }),
       );
     }
 

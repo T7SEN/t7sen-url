@@ -16,7 +16,7 @@ export function ProfileHeader() {
             src={profileData.avatarUrl}
             alt={`${profileData.name} avatar`}
             fill
-            priority
+            loading="eager"
             fetchPriority="high"
             decoding="async"
             sizes="96px"

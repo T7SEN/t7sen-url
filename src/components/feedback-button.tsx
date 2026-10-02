@@ -10,6 +10,8 @@ import { logger } from "@/lib/logger";
 // so this footer link is the only way in)
 export function FeedbackButton() {
   const buttonRef = React.useRef<HTMLButtonElement>(null);
+  // Whether a click actually opens the form, so an inert button isn't counted
+  const attachedRef = React.useRef(false);
   const posthog = usePostHog();
 
   React.useEffect(() => {
@@ -21,13 +23,21 @@ export function FeedbackButton() {
     // attachTo opens the form on click; its return value detaches it. The
     // form moves focus into itself and never restores it, so send keyboard
     // users back to the link when it closes or is submitted (WCAG 2.4.3)
-    return feedback.attachTo(button, {
+    const detach = feedback.attachTo(button, {
       onFormClose: () => button.focus(),
       onFormSubmitted: () => button.focus(),
     });
+    attachedRef.current = true;
+
+    return () => {
+      attachedRef.current = false;
+      detach();
+    };
   }, []);
 
   const handleClick = () => {
+    if (!attachedRef.current) return;
+
     if (posthog) {
       posthog.capture("feedback_opened");
     }

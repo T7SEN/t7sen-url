@@ -59,26 +59,37 @@ export function TwitchCard() {
     boundsRef.current = null;
   };
 
+  // While the page is visible and online, SWR calls onErrorRetry after every
+  // failed request it starts, focus revalidations included, so a timer per
+  // call stacked parallel 60 s retry loops during an outage. Keep exactly one
+  // pending retry.
+  const retryTimerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
+
+  React.useEffect(() => () => clearTimeout(retryTimerRef.current), []);
+
   const { data, error } = useSWR<TwitchStatus, TwitchFetchError>(
     `/api/twitch?channel=${channel}`,
     fetcher,
     {
       refreshInterval: 60000,
       revalidateOnFocus: true,
-      // Tab switching shouldn't eat the proxy's 10 req/min /api budget
+      // Focus revalidation at most every 30 s, however often the tab switches
       focusThrottleInterval: 30000,
       // SWR pauses refreshInterval while an error is cached, so retry on the
-      // same 60 s cadence (matches the proxy's Retry-After: 60) to keep polling
-      onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
-        setTimeout(() => revalidate({ retryCount }), 60000);
+      // same 60 s cadence as refreshInterval to keep polling
+      onErrorRetry: (_err, _key, _config, revalidate, opts) => {
+        clearTimeout(retryTimerRef.current);
+        retryTimerRef.current = setTimeout(() => revalidate(opts), 60000);
       },
+      onSuccess: () => clearTimeout(retryTimerRef.current),
     },
   );
 
   React.useEffect(() => {
     if (!error) return;
-    // An HTTP status means the route answered: 429 is the proxy limiter and
-    // 5xx is already reported server-side, so don't raise a second exception
+    // An HTTP status means the server answered: 5xx is already reported
+    // server-side (the proxy limiter exempts this route, so a 429 could only
+    // come from the platform), so don't raise a second exception
     if (error.status) {
       logger.warn("Twitch status request failed", {
         tags: {
@@ -95,14 +106,10 @@ export function TwitchCard() {
   }, [error]);
 
   // SWR keeps the last good data on a failed revalidation: show it rather than
-  // flipping a live stream to Offline; fall back to offline only with no data
-  let isLive: boolean | null = null;
-
-  if (data !== undefined) {
-    isLive = data.isLive === true;
-  } else if (error) {
-    isLive = false;
-  }
+  // flipping a live stream to Offline. With no data at all (the first request
+  // failed: a 5xx, no network) the status is unknown, not offline.
+  const isLive: boolean | null = data === undefined ? null : data.isLive === true;
+  const isUnknown = data === undefined && error !== undefined;
 
   const glareBackground = useMotionTemplate`
 		radial-gradient(
@@ -126,11 +133,26 @@ export function TwitchCard() {
     });
   };
 
-  if (isLive === null) {
+  // The channel name and tagline are static (profile.ts), so the skeleton
+  // renders the same text block as the loaded card: on phones the tagline
+  // wraps to 2-3 lines, and fixed-height placeholder bars made the card grow
+  // by up to 52px when the status arrived. Only the status parts pulse.
+  const channelText = (
+    <div className="text-left">
+      <h2 className="text-xl font-black tracking-tight text-zinc-900 transition-colors duration-300 group-hover:text-zinc-700 dark:text-zinc-50 dark:group-hover:text-white">
+        {channel}
+      </h2>
+      <p className="text-sm font-medium text-zinc-500 transition-colors duration-300 group-hover:text-zinc-600 dark:text-zinc-400 dark:group-hover:text-zinc-300">
+        {profileData.twitchTagline}
+      </p>
+    </div>
+  );
+
+  if (isLive === null && !isUnknown) {
     return (
-      <div className="w-full animate-pulse">
-        <div className="group relative block w-full overflow-hidden rounded-3xl border border-zinc-200/50 bg-white/60 shadow-xl dark:border-zinc-800/50 dark:bg-[#030303]">
-          <div className="relative h-32 w-full overflow-hidden bg-zinc-200 short:h-24 dark:bg-zinc-900">
+      <div className="w-full">
+        <div className="relative block w-full overflow-hidden rounded-3xl border border-zinc-200/50 bg-white/60 shadow-xl dark:border-zinc-800/50 dark:bg-[#030303]">
+          <div className="relative h-32 w-full animate-pulse overflow-hidden bg-zinc-200 short:h-24 dark:bg-zinc-900">
             <Image
               src={profileData.bannerUrl}
               alt={`${channel} Twitch Banner`}
@@ -138,21 +160,18 @@ export function TwitchCard() {
               decoding="async"
               sizes="(max-width: 640px) 100vw, 512px"
               className="object-cover opacity-30 grayscale dark:opacity-20"
-              priority
+              loading="eager"
               fetchPriority="high"
             />
           </div>
           <div className="relative -mt-5 flex flex-col items-center px-6 pb-6 text-center short:pb-4">
-            <div className="mb-5 h-7 w-24 rounded-full bg-zinc-300 short:mb-3 dark:bg-zinc-800" />
+            <div className="mb-5 h-7 w-24 animate-pulse rounded-full bg-zinc-300 short:mb-3 dark:bg-zinc-800" />
             <div className="flex w-full items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="h-14 w-14 rounded-2xl bg-zinc-300 dark:bg-zinc-800" />
-                <div className="space-y-2 text-left">
-                  <div className="h-5 w-28 rounded-md bg-zinc-300 dark:bg-zinc-800" />
-                  <div className="h-4 w-40 rounded-md bg-zinc-200 dark:bg-zinc-900" />
-                </div>
+                <div className="h-14 w-14 shrink-0 animate-pulse rounded-2xl bg-zinc-300 dark:bg-zinc-800" />
+                {channelText}
               </div>
-              <div className="h-10 w-10 rounded-full bg-zinc-300 dark:bg-zinc-800" />
+              <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-zinc-300 dark:bg-zinc-800" />
             </div>
           </div>
         </div>
@@ -161,9 +180,11 @@ export function TwitchCard() {
   }
 
   return (
-    // Short crossfade from the skeleton; the entrance itself lives on the
-    // wrapper in page-client (a delay here left a 500 ms blank gap)
-    <div className="w-full animate-in fade-in duration-300">
+    // No fade on this root: the skeleton already showed the channel name,
+    // tagline and banner, and re-animating them blinked them out. Only the
+    // parts that change fade in (badge via motion, icon tile and arrow via
+    // animate-in). The entrance itself lives on the wrapper in page-client.
+    <div className="w-full">
       <a
         href={`https://twitch.tv/${channel}`}
         target="_blank"
@@ -193,7 +214,7 @@ export function TwitchCard() {
                 ? "scale-105 opacity-50 group-hover:scale-110 group-hover:opacity-70 dark:opacity-50"
                 : "scale-100 opacity-30 grayscale group-hover:opacity-50 group-hover:grayscale-0 dark:opacity-20 dark:group-hover:opacity-30",
             )}
-            priority
+            loading="eager"
             fetchPriority="high"
           />
           <div className="absolute inset-0 bg-linear-to-t from-white/60 via-transparent to-transparent dark:from-[#030303]" />
@@ -226,12 +247,12 @@ export function TwitchCard() {
                 </motion.div>
               ) : (
                 <motion.div
-                  key="offline"
+                  key={isUnknown ? "unknown" : "offline"}
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-5 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 shadow-sm backdrop-blur-md transition-colors group-hover:border-zinc-300 group-hover:text-zinc-700 dark:border-zinc-700/50 dark:bg-zinc-800/60 dark:text-zinc-400 dark:shadow-none dark:group-hover:border-zinc-600 dark:group-hover:text-zinc-300"
+                  className="flex items-center gap-2 whitespace-nowrap rounded-full border border-zinc-200 bg-white/80 px-5 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 shadow-sm backdrop-blur-md transition-colors group-hover:border-zinc-300 group-hover:text-zinc-700 dark:border-zinc-700/50 dark:bg-zinc-800/60 dark:text-zinc-400 dark:shadow-none dark:group-hover:border-zinc-600 dark:group-hover:text-zinc-300"
                 >
-                  Offline
+                  {isUnknown ? "Status unknown" : "Offline"}
                 </motion.div>
               )}
             </AnimatePresence>
@@ -241,7 +262,7 @@ export function TwitchCard() {
             <div className="flex items-center gap-4">
               <div
                 className={cn(
-                  "relative flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border backdrop-blur-md transition-all duration-500 group-hover:scale-110",
+                  "relative flex h-14 w-14 shrink-0 animate-in fade-in items-center justify-center rounded-2xl border backdrop-blur-md transition-all duration-500 group-hover:scale-110",
                   isLive
                     ? "border-[#9146FF]/30 bg-white/80 text-[#9146FF] shadow-[0_0_20px_rgba(145,70,255,0.2)] group-hover:bg-[#9146FF] group-hover:text-white dark:border-[#9146FF]/50 dark:bg-[#9146FF]/20 dark:shadow-[0_0_20px_rgba(145,70,255,0.4)]"
                     : "border-zinc-200 bg-white text-zinc-500 shadow-sm group-hover:border-zinc-300 group-hover:bg-zinc-50 group-hover:text-zinc-700 dark:border-zinc-700/50 dark:bg-zinc-800/50 dark:text-zinc-400 dark:shadow-none dark:group-hover:border-zinc-600 dark:group-hover:bg-zinc-700 dark:group-hover:text-zinc-200",
@@ -250,19 +271,12 @@ export function TwitchCard() {
                 <Icons.twitch className="relative z-10 h-7 w-7 transition-transform duration-500 group-hover:-rotate-12" />
               </div>
 
-              <div className="text-left">
-                <h2 className="text-xl font-black tracking-tight text-zinc-900 transition-colors duration-300 group-hover:text-zinc-700 dark:text-zinc-50 dark:group-hover:text-white">
-                  {channel}
-                </h2>
-                <p className="text-sm font-medium text-zinc-500 transition-colors duration-300 group-hover:text-zinc-600 dark:text-zinc-400 dark:group-hover:text-zinc-300">
-                  {profileData.twitchTagline}
-                </p>
-              </div>
+              {channelText}
             </div>
 
             <div
               className={cn(
-                "flex h-10 w-10 shrink-0 items-center justify-center rounded-full border backdrop-blur-md transition-all duration-300 group-hover:-rotate-45",
+                "flex h-10 w-10 shrink-0 animate-in fade-in items-center justify-center rounded-full border backdrop-blur-md transition-all duration-300 group-hover:-rotate-45",
                 isLive
                   ? "border-[#9146FF]/20 bg-white/50 text-[#9146FF] group-hover:border-[#9146FF]/40 group-hover:bg-[#9146FF]/10 dark:border-[#9146FF]/30 dark:bg-[#9146FF]/10 dark:group-hover:border-[#9146FF]/50 dark:group-hover:bg-[#9146FF]/20"
                   : "border-zinc-200 bg-zinc-50 text-zinc-400 group-hover:border-zinc-300 group-hover:bg-zinc-100 group-hover:text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-500 dark:group-hover:border-zinc-600 dark:group-hover:bg-zinc-700 dark:group-hover:text-zinc-300",

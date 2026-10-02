@@ -45,46 +45,50 @@ export async function GET(request: NextRequest) {
 
     const { isLive, game } = await getStreamStatus(channel);
 
-    // Background Analytics Tracking
-    try {
-      const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
-      // The browser's PostHog ID (its same-origin fetch sends the cookie), never the IP
-      const identity = readPostHogIdentity(
-        token ? request.cookies.get(posthogCookieName(token))?.value : undefined,
-      );
-      const posthog = getPostHogClient();
+    // Background Analytics Tracking. No token: skip silently like the proxy
+    // does (the PostHog constructor throws, which reported a Sentry error on
+    // every call)
+    const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
+    if (token) {
+      try {
+        // The browser's PostHog ID (its same-origin fetch sends the cookie), never the IP
+        const identity = readPostHogIdentity(
+          request.cookies.get(posthogCookieName(token))?.value,
+        );
+        const posthog = getPostHogClient();
 
-      posthog.capture({
-        distinctId: identity.distinctId,
-        event: "twitch_api_called",
-        // 🚀 Track the game in PostHog
-        properties: {
-          channel,
-          is_live: isLive,
-          game,
-          ...serverEventProperties(identity),
-        },
-      });
+        posthog.capture({
+          distinctId: identity.distinctId,
+          event: "twitch_api_called",
+          // 🚀 Track the game in PostHog
+          properties: {
+            channel,
+            is_live: isLive,
+            game,
+            ...serverEventProperties(identity),
+          },
+        });
 
-      // Sent after the response: awaiting shutdown() here (up to 30 s with
-      // retries) held every poll's response hostage to PostHog. Capped at 5 s
-      // so a PostHog outage doesn't keep every poll's function alive for 30 s.
-      after(async () => {
-        try {
-          await posthog.shutdown(5000);
-        } catch (analyticsError: unknown) {
-          logger.error(analyticsError, {
-            tags: { component: "PostHogServer" },
-          });
-        } finally {
-          // The route's own flush ran concurrently and may be done already
-          await flushSentry();
-        }
-      });
-    } catch (analyticsError: unknown) {
-      logger.error(analyticsError, {
-        tags: { component: "PostHogServer" },
-      });
+        // Sent after the response: awaiting shutdown() here (up to 30 s with
+        // retries) held every poll's response hostage to PostHog. Capped at 5 s
+        // so a PostHog outage doesn't keep every poll's function alive for 30 s.
+        after(async () => {
+          try {
+            await posthog.shutdown(5000);
+          } catch (analyticsError: unknown) {
+            logger.error(analyticsError, {
+              tags: { component: "PostHogServer" },
+            });
+          } finally {
+            // The route's own flush ran concurrently and may be done already
+            await flushSentry();
+          }
+        });
+      } catch (analyticsError: unknown) {
+        logger.error(analyticsError, {
+          tags: { component: "PostHogServer" },
+        });
+      }
     }
 
     // 🚀 Return BOTH the live status and the game

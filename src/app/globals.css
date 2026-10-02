@@ -5,9 +5,10 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Wide but short viewports (most laptops): `short:` tightens the vertical
-   rhythm so the page fits without a scrollbar. At full size the content is
-   ~900px tall; compact it is ~720px. Taller screens keep the full design and
-   phones scroll. */
+   rhythm. At full size the content is ~899px tall; compact it is ~727px, so
+   windows 727-940px tall fit without a scrollbar and shorter ones (e.g. a
+   1366x768 laptop's ~650px viewport) still scroll a little. Taller screens
+   keep the full design and phones scroll. */
 @custom-variant short (@media (min-width: 48rem) and (max-height: 58.75rem));
 
 @theme inline {

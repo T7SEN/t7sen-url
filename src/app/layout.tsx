@@ -65,7 +65,7 @@ export default function RootLayout({
           inmaintabuse, cz-shortcut-listen). The app never sets body attributes,
           and this only covers <body> itself, not its children. */}
       <body
-        className={`${spaceGrotesk.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
+        className={`${spaceGrotesk.variable} min-h-dvh antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
         suppressHydrationWarning
       >
         <PostHogProvider>

@@ -67,7 +67,7 @@ export function readPostHogIdentity(raw: string | undefined): PostHogIdentity {
  * Properties every server-side event should carry: no person profile (the
  * site never identifies anyone, matching posthog-js identified_only), the
  * browser session when known, and no GeoIP (PostHog would geolocate Vercel's
- * server, not the visitor; events send `country` explicitly instead).
+ * server, not the visitor). Only short_link_clicked sends `country` itself.
  */
 export function serverEventProperties(
   identity: PostHogIdentity,

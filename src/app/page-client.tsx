@@ -59,8 +59,10 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
       <main className="relative flex min-h-dvh w-full flex-col items-center px-4 font-sans sm:px-6">
         {/* Top bar in normal DOM order (share left, theme right). Below md it
             would sit over the column, so the content gets pt-20; from md up the
-            buttons sit in the corners beside the centred max-w-lg column */}
-        <div className="absolute inset-x-4 top-4 z-50 flex items-center justify-between">
+            buttons sit in the corners beside the centred max-w-lg column. The
+            bar's empty middle spans the column on short screens, so only the
+            buttons take the pointer */}
+        <div className="pointer-events-none absolute inset-x-4 top-4 z-50 flex items-center justify-between *:pointer-events-auto">
           <ShareProfileButton />
           <ThemeToggle />
         </div>

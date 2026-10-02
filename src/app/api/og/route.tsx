@@ -14,7 +14,6 @@ const SIZE = { width: 1200, height: 630 };
 // Crawlers (X, Discord, Slack...) give up after a few seconds, so the image
 // renders without the LIVE badge rather than waiting on a slow Twitch
 const STATUS_BUDGET_MS = 2500;
-const AVATAR_TIMEOUT_MS = 2500;
 
 // CDN-cache each render for 5 minutes; next/og's default is max-age=0, which
 // re-rendered on every crawler hit. No stale-while-revalidate: it would hand
@@ -93,25 +92,24 @@ async function getStatusWithinBudget(): Promise<BudgetedStatus> {
   }
 }
 
-// Fetched here (with a timeout) and inlined, instead of letting satori fetch
-// the URL during rendering, where a slow response would stall the image
-async function getAvatarDataUrl(origin: string): Promise<string | null> {
-  // The OG renderer cannot decode WebP, so it uses the PNG copy
-  const avatarPath = profileData.avatarUrl.replace(".webp", ".png");
-  try {
-    const res = await fetch(new URL(avatarPath, origin), {
-      signal: AbortSignal.timeout(AVATAR_TIMEOUT_MS),
+// The PNG copy of profileData.avatarUrl (the OG renderer cannot decode WebP),
+// read from disk like the fonts and inlined as a data URL, once per instance.
+// It used to be fetched over HTTP from the request origin, which Vercel
+// Deployment Protection refuses on preview URLs (initials instead). Literal
+// path so Next traces the file into this function.
+let avatarPromise: Promise<string | null> | null = null;
+
+function loadAvatarDataUrl(): Promise<string | null> {
+  avatarPromise ??= readFile(join(process.cwd(), "public/avatar.png"))
+    .then((bytes) => `data:image/png;base64,${bytes.toString("base64")}`)
+    .catch((err: unknown) => {
+      logger.warn("OG image could not load the avatar", {
+        tags: { component: "DynamicOGImage" },
+        extra: { error: err instanceof Error ? err.message : String(err) },
+      });
+      return null;
     });
-    if (!res.ok) throw new Error(`Avatar fetch failed: ${res.status}`);
-    const bytes = Buffer.from(await res.arrayBuffer());
-    return `data:image/png;base64,${bytes.toString("base64")}`;
-  } catch (err: unknown) {
-    logger.warn("OG image could not load the avatar", {
-      tags: { component: "DynamicOGImage" },
-      extra: { error: err instanceof Error ? err.message : String(err) },
-    });
-    return null;
-  }
+  return avatarPromise;
 }
 
 export async function GET(request: Request) {
@@ -129,7 +127,7 @@ export async function GET(request: Request) {
 
     const [statusResult, avatarSrc, fonts] = await Promise.all([
       getStatusWithinBudget(),
-      getAvatarDataUrl(origin),
+      loadAvatarDataUrl(),
       loadFonts(),
     ]);
     const { isLive, game } = statusResult.status;

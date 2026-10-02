@@ -94,15 +94,21 @@ comes from `x-real-ip` and the country from `x-vercel-ip-country` →
 Cloudflare in front).
 
 - **Layer 1 — `/api/*` firewall.** User-agent blocklist (`BLOCKED_AGENTS`,
-  lowercase) → 403. In-memory per-IP limiter: 10 requests / 60 s across
-  **all** `/api/*` routes → 429 with `Retry-After: 60`. Map is swept when it
-  exceeds 1000 keys. Passing requests return `NextResponse.next()` untouched.
+  lowercase) → 403. In-memory per-IP limiter: 10 requests / 60 s across the
+  `/api/*` routes → 429 with `Retry-After: 60`, **except the card's exact poll
+  URL `/api/twitch?channel=<profileData.twitchChannel>`** (visitors behind one
+  NAT/CGNAT IP all poll it every minute and the 11th tab got a 429; that URL
+  is CDN-cached 60 s and memoised 30 s). Any other query on `/api/twitch`
+  misses the CDN cache, so it keeps the budget. Map is
+  swept when it exceeds 1000 keys. Passing requests return
+  `NextResponse.next()` untouched.
 - **Layer 2 — `/go/<slug>` redirects.** Slug is lowercased with trailing
   slashes stripped (`skipTrailingSlashRedirect` is on) and looked up in
   `redirectMap`. Unknown slug → `console.warn` + redirect to `/`. Known slug →
   **307** to the destination for every method and agent; PostHog
   `short_link_clicked` (raw `fetch` to `eu.i.posthog.com` inside
-  `event.waitUntil`, failures → Sentry) fires only for `GET` requests with a
+  `event.waitUntil`; network errors and non-2xx answers → Sentry) fires only
+  for `GET` requests with a
   user agent that is not a bot (`userAgent().isBot`, `/\bbot\b/`,
   `NON_HUMAN_AGENTS`) and not a prefetch (`Sec-Purpose`/`Purpose`), so
   unfurlers, HEAD probes, crawlers and HTTP clients are not counted.
@@ -133,10 +139,15 @@ than the screen: a `flex-1` wrapper centres the column and pushes the footer
 The top bar is `absolute inset-x-4 top-4`; below `md` it would sit over the
 column, so the wrapper has `pt-20` (bar height `h-10`, `sm:h-12` — change them
 together); from `md` up the buttons sit beside the centred `max-w-lg` column,
-so `md:pt-8`. Wide-but-short screens use the `short:` variant (defined in
+so `md:pt-8`. The bar is `pointer-events-none` with `*:pointer-events-auto`
+so its empty middle never blocks hover on the card beneath it on short
+screens. Wide-but-short screens use the `short:` variant (defined in
 `globals.css`: ≥768px wide, ≤940px tall) to tighten spacing, the avatar and
 the Twitch banner: content is ~899px at full size and ~727px compact, so wide
-windows ≥727px tall fit without a scrollbar; phones scroll. Entrances are CSS (`tw-animate-css`) staggered by
+windows ≥727px tall fit without a scrollbar (a 1366×768 laptop's ~650px
+viewport still scrolls ~77px); phones scroll. `<body>` is `min-h-dvh`, not
+`min-h-screen` (100vh is the toolbar-hidden height on mobile and forces a
+phantom scroll). Entrances are CSS (`tw-animate-css`) staggered by
 per-element delays, so the server HTML paints without waiting for JS; the
 support card's entrance sits on its shadowed wrapper in `page-client.tsx`.
 
@@ -151,9 +162,18 @@ in `proxy.ts`. The `twitter` social entry uses `/go/x`; both `twitter` and
 **Twitch live status.** `TwitchCard` polls `/api/twitch?channel=…` via SWR
 (60 s interval, revalidate on focus throttled to 30 s). The fetcher throws on
 non-2xx, so a 429/500 never overwrites good data: the card shows the last
-known status, a skeleton before the first response, and offline only when the
-first fetch fails. SWR pauses `refreshInterval` while an error is cached, so
-`onErrorRetry` retries every 60 s to keep polling; HTTP errors are logged as
+known status, a skeleton before the first response, and a neutral "Status
+unknown" badge (not "Offline") when it has no data because the first
+fetch failed. The skeleton renders the real channel name and tagline (static
+from `profile.ts`) so it has the loaded card's height at every width; only
+the badge, icon, arrow and banner pulse, and on load only the badge, icon
+tile and arrow fade in (the root has no fade, which blinked the text). SWR pauses `refreshInterval` while
+an error is cached, so `onErrorRetry` retries every 60 s to keep polling,
+with **one** pending retry timer (while the page is visible and online, SWR
+calls `onErrorRetry` after every failed request it starts, focus
+revalidations included, so a timer per call stacked parallel retry loops; a
+failure in a hidden tab schedules nothing and focus revalidation resumes
+polling); `onSuccess` and unmount clear it. HTTP errors are logged as
 warnings (the server already reports 5xx), network errors as errors. The
 route validates the channel (`/^[a-zA-Z0-9_]{2,25}$/`), answers only for
 `profileData.twitchChannel` (400 otherwise), and calls `getStreamStatus()`
@@ -169,9 +189,9 @@ bodies and hid 401s. The route responds with
 `Cache-Control: public, s-maxage=60, stale-while-revalidate=30`. Timeout →
 **200** `{ isLive: false }` (graceful); missing credentials
 (`TwitchConfigError`) or any other failure → 500 `{ isLive: false }` + Sentry.
-Each call also fires server-side PostHog `twitch_api_called` (new client per
-request; `shutdown()` runs in `after()`, so the response never waits on
-PostHog).
+Each call also fires server-side PostHog `twitch_api_called` when the
+PostHog token is set (new client per request; `shutdown()` runs in
+`after()`, so the response never waits on PostHog).
 
 **OG image.** `/api/og` renders a 1200×630 `ImageResponse` with **fixed text
 only** (`profileData.name`, `profileData.ogSubtitle`, the Twitch tagline or
@@ -181,9 +201,11 @@ this domain; `layout.tsx` points `og:image` at plain `/api/og`. It calls
 capped at 2.5 s so crawlers get an image without the badge rather than a
 timeout; a call that loses that race is kept alive with `after()` so it
 still fills the caches. Game names longer than 36 characters are truncated
-with an ellipsis. The avatar (`.png`, since the renderer cannot decode WebP) is
-fetched from the request origin with a 2.5 s timeout and inlined as a data
-URL; on failure the initials are drawn instead. Fonts are static Space
+with an ellipsis. The avatar (`public/avatar.png`, since the renderer cannot
+decode WebP) is read from disk once per instance and inlined as a data URL
+(it used to be fetched over HTTP from the request origin, which Vercel
+Deployment Protection refuses on preview URLs); on failure the initials are
+drawn instead. Fonts are static Space
 Grotesk Medium/Bold TTFs in `assets/fonts/` (OFL-1.1, `OFL.txt` alongside),
 read with `readFile(join(process.cwd(), ...))` so Next traces them into the
 function; next/og only bundles Geist Regular and cannot read woff2. If they
@@ -202,8 +224,10 @@ a relative `api_host` makes posthog-js send every API and asset request
 there, so the CSP needs no PostHog origin; the one exception is the PostHog
 toolbar, see landmine 6). Owner/preview traffic is tagged with the
 `$internal_or_test_user` person property (`internal_or_test_user_hostname`
-for localhost and `*.vercel.app`, plus `setInternalOrTestUser()` after one
-visit with `?internal`). **Tagging alone excludes nothing.** One-time PostHog
+for localhost, plus `*.vercel.app` only when `NEXT_PUBLIC_VERCEL_ENV` is
+`preview` — production also answers on its `*.vercel.app` alias and those
+visitors are real; plus `setInternalOrTestUser()` after one visit with
+`?internal`). **Tagging alone excludes nothing.** One-time PostHog
 setup: create a cohort "Internal/test users" where person property
 `$internal_or_test_user` is set, then in Project settings → "Filter out
 internal and test users" add "Cohort not in Internal/test users" (a cohort,
@@ -218,8 +242,9 @@ the session ID only while it is still live by posthog-js's rules — 30 min
 idle, 24 h max — since the cookie keeps an expired `$sesid` until the next
 browser event), and adds `$process_person_profile: false` (no person profiles, matching
 posthog-js `identified_only`) and `$geoip_disable: true` (PostHog would
-geolocate Vercel's server; events carry `country` instead).
-`short_link_clicked` also sends `$referrer`.
+geolocate Vercel's server). Only `short_link_clicked` carries a location
+(`country`, from `x-vercel-ip-country`) and `$referrer`; `twitch_api_called`
+has none (posthog-node never sent GeoIP either).
 
 Event catalog:
 
@@ -229,9 +254,9 @@ Event catalog:
 | `social_link_clicked` | `page-client.tsx`, `copy-email-button.tsx` (with `method`: `clipboard` \| `mailto_fallback`) |
 | `profile_shared` (with `method`: `native` \| `clipboard`, after the share succeeds) | `share-profile-button.tsx` |
 | `support_link_clicked` | `support-card.tsx` |
-| `twitch_card_clicked` | `twitch-card.tsx` |
+| `twitch_card_clicked` (`is_live`: `true` | `false` | `null` when the status is unknown) | `twitch-card.tsx` |
 | `theme_toggled` | `theme-toggle.tsx` |
-| `feedback_opened` | `feedback-button.tsx` |
+| `feedback_opened` (only when the Sentry form is attached, i.e. a DSN is set) | `feedback-button.tsx` |
 | `twitch_api_called` (server) | `api/twitch/route.ts` |
 | `short_link_clicked` (proxy) | `proxy.ts` |
 
@@ -330,7 +355,9 @@ font; `font-mono` falls back to Tailwind's default stack).
 
 ```
 NEXT_PUBLIC_APP_URL                Canonical origin. Used by metadata, JSON-LD,
-                                   robots, sitemap, and the OG image's domain line.
+                                   robots, sitemap, the OG image's domain line,
+                                   and the Share button's URL (inlined into the
+                                   client bundle at build time).
 TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET   Helix client-credentials flow.
 NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN  Browser, proxy, and server PostHog.
 NEXT_PUBLIC_POSTHOG_HOST           posthog-node host (server only).
@@ -338,8 +365,12 @@ NEXT_PUBLIC_SENTRY_DSN             All three Sentry runtimes.
 ```
 
 Missing Twitch credentials → `/api/twitch` returns 500 and the card shows
-offline. Missing PostHog token → proxy skips click tracking silently. Wrong
-`NEXT_PUBLIC_APP_URL` → wrong canonical/OG URLs (link previews break).
+"Status unknown". Missing PostHog token → the proxy and `/api/twitch`
+skip their server events silently. Wrong `NEXT_PUBLIC_APP_URL` → wrong
+canonical/OG URLs (link previews break) and the Share button hands out the
+wrong link. `NEXT_PUBLIC_VERCEL_ENV` is set by Vercel itself at build time
+(framework environment variable, not in `.env.local`); `PostHogProvider`
+reads it to tag preview traffic.
 
 ## Commands
 
@@ -369,10 +400,12 @@ every change with `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
 
 3. **The firewall covers every `/api/*` route** — including `/api/health` and
    `/api/og`. Uptime monitors using `curl` or `python-requests` get **403**.
-   The 10 req/min budget is shared per IP across all API routes (the OG
-   route no longer self-fetches `/api/twitch`; it calls `src/lib/twitch.ts`
-   directly, so it never spends that budget). `/api/twitch`
-   answers only for `profileData.twitchChannel`; any other channel is a 400.
+   The 10 req/min budget is shared per IP across the API routes except the
+   card's exact `/api/twitch` poll URL, which is exempt (shared-IP visitors
+   tripped it; see Layer 1). The OG route calls `src/lib/twitch.ts`
+   directly, never `/api/twitch`. `/api/twitch` answers only for
+   `profileData.twitchChannel`; any other channel is a 400. Every poll still
+   runs the proxy (Routing Middleware runs before the CDN cache).
 
 4. **Cache Components rules.** `/` is fully static — keep it that way. Never
    read `cookies()` or `headers()` in the page, and read `Date` /
@@ -411,7 +444,10 @@ every change with `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
 
 7. **Images are unoptimized.** `images.unoptimized: true` — `next/image` does
    not resize. Ship pre-sized assets. Keep `public/avatar.png`: the OG route
-   depends on it because it cannot decode WebP.
+   reads it from disk because it cannot decode WebP. Above-the-fold images use
+   `loading="eager"` + `fetchPriority="high"`; `priority` is deprecated in
+   Next 16, and its replacement `preload` must not be combined with
+   `fetchPriority`.
 
 8. **Two `instrumentation-client.ts` files.** `src/instrumentation-client.ts`
    (Sentry) is live. The **root** copy is fully commented-out PostHog init and
