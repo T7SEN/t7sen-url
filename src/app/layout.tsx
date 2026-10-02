@@ -1,6 +1,8 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
 import { Space_Grotesk, Geist_Mono } from "next/font/google";
+import { Analytics } from "@vercel/analytics/next";
+import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { MotionProvider } from "@/components/motion-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
@@ -73,6 +75,9 @@ export default function RootLayout({
             <MotionProvider>{children}</MotionProvider>
           </ThemeProvider>
         </PostHogProvider>
+        {/* Client-only; each wraps itself in <Suspense>, so the shell stays static */}
+        <Analytics />
+        <SpeedInsights />
       </body>
     </html>
   );

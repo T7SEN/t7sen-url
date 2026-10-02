@@ -18,8 +18,9 @@ in the repo root.
 Next.js 16.2 (App Router, `cacheComponents`, `reactCompiler`) · React 19.2 ·
 TypeScript 5 strict · Tailwind CSS v4 (CSS-configured, no JS config) ·
 shadcn/ui (`base-nova`) · motion (`LazyMotion strict`) · SWR · next-themes ·
-Sentry · PostHog (EU). Package manager: **npm**. Path alias `@/*` → `src/*`.
-No database, no auth — all server state is in-memory.
+Sentry · PostHog (EU) · Vercel Web Analytics + Speed Insights. Package
+manager: **npm**. Path alias `@/*` → `src/*`. No database, no auth — all
+server state is in-memory.
 
 ## Commands
 

@@ -2,10 +2,16 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
+// Vercel Web Analytics / Speed Insights load their debug scripts from this
+// origin under `next dev` only; production serves them from /_vercel/* (self).
+const vercelDevScripts =
+  process.env.NODE_ENV === "development" ? " https://va.vercel-scripts.com" : "";
+
 const csp = [
   "default-src 'self'",
   "script-src 'self' 'unsafe-eval' 'unsafe-inline' " +
-    "https://eu.i.posthog.com https://eu-assets.i.posthog.com",
+    "https://eu.i.posthog.com https://eu-assets.i.posthog.com" +
+    vercelDevScripts,
   "worker-src 'self' blob:",
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' blob: data: https:",

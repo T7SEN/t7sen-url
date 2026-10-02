@@ -34,6 +34,8 @@ channels. Small surface, tight coupling.
 - **SWR 2.4** (Twitch polling only), **next-themes 0.4.6**, **lucide-react**.
 - **Sentry 10.48** (`@sentry/nextjs`), **PostHog** (`posthog-js` 1.364,
   `posthog-node` 5.28), EU region.
+- **Vercel Web Analytics** (`@vercel/analytics` 2.0) and **Speed Insights**
+  (`@vercel/speed-insights` 2.0), rendered in `layout.tsx`.
 - **npm** (package-lock.json committed).
 
 There is **no database, no auth, no Redis, no persistent store**. All
@@ -79,7 +81,8 @@ Next 16 renamed `middleware.ts` → `proxy.ts`, and **proxy runs on the Node.js
 runtime only — Edge is not supported and not configurable.** The file's
 "Edge Firewall" / "Edge Redirect" labels are historical (it was
 `middleware.ts` until commit `e5d0117`). Matcher excludes `_next/static`,
-`_next/image`, `favicon.ico`, `sitemap.xml`, `robots.txt`.
+`_next/image`, `_vercel` (Vercel analytics scripts and beacons), `favicon.ico`,
+`sitemap.xml`, `robots.txt`.
 
 - **Layer 1 — `/api/*` firewall.** User-agent blocklist (`BLOCKED_AGENTS`) →
   403. In-memory per-IP limiter: 10 requests / 60 s across **all** `/api/*`
@@ -150,6 +153,17 @@ Event catalog:
 | `theme_toggled` | `theme-toggle.tsx` |
 | `twitch_api_called` (server) | `api/twitch/route.ts` |
 | `short_link_clicked` (proxy) | `proxy.ts` |
+
+**Analytics (Vercel).** `<Analytics />` and `<SpeedInsights />` (from the
+`/next` entry points) render at the end of `<body>` in `layout.tsx`. Both are
+client components that wrap themselves in `<Suspense>`, so the static shell is
+unaffected. Scripts and beacons are first-party under `/_vercel/*` (excluded
+from the proxy matcher), and each feature must be enabled per project in the
+Vercel dashboard or its script 404s. Hobby limits: Web Analytics 50k
+events/month account-wide, page views only (no custom events); Speed Insights
+10k events per rolling 30 days, Real Experience Score only — per-metric Core
+Web Vitals come from Sentry tracing. Exceeding either pauses collection, not
+the site.
 
 **Observability (Sentry).** Org `t7sen-c0`, project `links`, tunnel
 `/monitoring`. Server/edge init via `src/instrumentation.ts`; browser init in
@@ -252,7 +266,9 @@ every change with `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
    `connect-src` allow only self + PostHog EU. Any new script, fetch, or
    WebSocket domain must be added to `csp` in `next.config.ts` or the browser
    blocks it with only a console error. (`img-src` already allows any
-   `https:`.)
+   `https:`.) `next dev` alone also allows `https://va.vercel-scripts.com`
+   (`vercelDevScripts`) for the Vercel analytics debug scripts; production
+   serves them from `/_vercel/*`.
 
 7. **Images are unoptimized.** `images.unoptimized: true` — `next/image` does
    not resize. Ship pre-sized assets. Keep `public/avatar.png`: the OG route

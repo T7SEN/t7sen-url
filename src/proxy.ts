@@ -150,8 +150,9 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
 // =========================================================
 // 3. MATCHER CONFIGURATION
 // =========================================================
+// `_vercel` keeps Vercel Web Analytics / Speed Insights beacons out of the proxy
 export const config = {
   matcher: [
-    "/((?!_next/static|_next/image|favicon.ico|sitemap.xml|robots.txt).*)",
+    "/((?!_next/static|_next/image|_vercel|favicon.ico|sitemap.xml|robots.txt).*)",
   ],
 };

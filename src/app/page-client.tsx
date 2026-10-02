@@ -21,6 +21,7 @@ import { SupportCard } from "@/components/support-card"; // 🚀 Removed dynamic
 import { usePostHog } from "posthog-js/react";
 import { logger } from "@/lib/logger";
 import { ShareProfileButton } from "@/components/share-profile-button";
+import BorderGlow from "@/components/BorderGlow";
 
 const containerVariants: Variants = {
   hidden: { opacity: 0 },
@@ -116,6 +117,7 @@ export default function PageClient({
             onMouseLeave={handleMouseLeave}
             className="group relative flex w-full max-w-lg max-h-[85dvh] flex-col rounded-3xl border border-zinc-200/50 bg-white/40 shadow-2xl backdrop-blur-xl dark:border-zinc-800/50 dark:bg-zinc-950/40"
           >
+    
             <motion.div
               className="pointer-events-none absolute -inset-px z-50 rounded-3xl border border-[#9146FF] opacity-0 transition-opacity duration-500 group-hover:opacity-100"
               style={{
