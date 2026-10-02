@@ -98,7 +98,7 @@ const nextConfig: NextConfig = {
 };
 
 export default withSentryConfig(nextConfig, {
-  org: "t7sen-c0",
+  org: "t7sen",
   project: "links",
   silent: !process.env.CI,
   widenClientFileUpload: true,

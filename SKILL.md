@@ -165,11 +165,15 @@ events/month account-wide, page views only (no custom events); Speed Insights
 Web Vitals come from Sentry tracing. Exceeding either pauses collection, not
 the site.
 
-**Observability (Sentry).** Org `t7sen-c0`, project `links`, tunnel
-`/monitoring`. Server/edge init via `src/instrumentation.ts`; browser init in
-`src/instrumentation-client.ts` (Session Replay with all text/media masked,
-feedback widget, console-log capture). `src/lib/logger.ts` wraps
-`Sentry.logger`; `logger.error(err, ctx)` also calls `captureException`.
+**Observability (Sentry).** Org `t7sen` (formerly `t7sen-c0`), project
+`links`, tunnel `/monitoring`. Server/edge init via `src/instrumentation.ts`;
+browser init in `src/instrumentation-client.ts` (Session Replay with all
+text/media masked, feedback widget, console-log capture). `src/lib/logger.ts`
+wraps `Sentry.logger`; `logger.error(err, ctx)` also calls `captureException`.
+`SENTRY_AUTH_TOKEN` is an org auth token with the org slug embedded, and
+`sentry-cli` uses that slug over the `org` option — renaming the org breaks
+source-map upload until a new token is issued. Local builds hide the failure
+(`silent: !process.env.CI`); Vercel builds log it but do not fail.
 
 **Health.** `/api/health` returns status, uptime, and process memory; warns to
 Sentry above 500 MB heap. Note: it sits behind the proxy firewall (see
