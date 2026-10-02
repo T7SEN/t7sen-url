@@ -14,6 +14,8 @@ export interface ProfileConfig {
   name: string;
   twitchChannel: string;
   twitchTagline: string;
+  /** Subtitle on the /api/og share image (the route takes no text from the URL) */
+  ogSubtitle: string;
   bio: string;
   avatarUrl: string;
   bannerUrl: string;
@@ -31,6 +33,7 @@ export const profileData: ProfileConfig = {
   name: "T7SEN",
   twitchChannel: "it7sen",
   twitchTagline: "Building software. Destroying lobbies.",
+  ogSubtitle: "Portfolio & Links",
   bio: "Software Architect by day. Streamer & Gamer by night.",
   avatarUrl: "/avatar.webp",
   bannerUrl: "/twitch-banner.webp",

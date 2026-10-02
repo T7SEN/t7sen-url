@@ -9,34 +9,27 @@ interface SupportCardProps {
   title: string;
   subtitle: string;
   url: string;
-  variant: string;
 }
 
-export function SupportCard({
-  title,
-  subtitle,
-  url,
-  variant,
-}: SupportCardProps) {
+export function SupportCard({ title, subtitle, url }: SupportCardProps) {
   const posthog = usePostHog();
 
   const handleClick = () => {
     if (posthog) {
       posthog.capture("support_link_clicked", {
-        ab_variant: variant,
         button_text: title,
         support_url: url,
       });
     }
 
     logger.info("Support card clicked", {
-      tags: { component: "SupportCard", variant },
+      tags: { component: "SupportCard" },
     });
   };
 
   return (
-    // 🚀 Added delay-700 so it loads just after the Primary links
-    <div className="w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-700 duration-700">
+    // Entrance lives on the shadowed wrapper in page-client (delay-700)
+    <div className="w-full">
       <a
         href={url}
         target="_blank"
@@ -51,7 +44,7 @@ export function SupportCard({
       >
         <div
           className={cn(
-            "relative flex w-full items-center justify-between rounded-[calc(1rem-1px)] p-4 backdrop-blur-md transition-colors duration-500",
+            "relative flex w-full items-center justify-between rounded-[calc(1rem-1px)] p-4 backdrop-blur-md transition-colors duration-500 short:p-3",
             "bg-white/80 group-hover:bg-white",
             "dark:bg-[#030303]/90 dark:group-hover:bg-[#030303]",
           )}
@@ -92,8 +85,9 @@ export function SupportCard({
               <p
                 className={cn(
                   "text-[11px] font-bold transition-colors duration-500",
-                  "text-[#9146FF]/80 group-hover:text-[#9146FF]",
-                  "dark:text-[#9146FF]/70 dark:group-hover:text-[#9146FF]",
+                  // WCAG AA (4.5:1) at 11px: #9146FF/80 was ~3.4:1 light, ~2.6:1 dark
+                  "text-violet-700 group-hover:text-violet-800",
+                  "dark:text-[#A970FF] dark:group-hover:text-[#BF94FF]",
                 )}
               >
                 {subtitle}

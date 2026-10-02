@@ -16,7 +16,19 @@ import { cn } from "@/lib/utils";
 import useSWR from "swr";
 import { logger } from "@/lib/logger";
 
-const fetcher = (url: string) => fetch(url).then((res) => res.json());
+type TwitchStatus = { isLive: boolean; game?: string | null };
+type TwitchFetchError = Error & { status?: number };
+
+// Throw on non-2xx so a 429/500 body never replaces the last known status
+const fetcher = async (url: string): Promise<TwitchStatus> => {
+  const res = await fetch(url);
+  if (!res.ok) {
+    throw Object.assign(new Error(`/api/twitch responded ${res.status}`), {
+      status: res.status,
+    });
+  }
+  return res.json();
+};
 
 export function TwitchCard() {
   const posthog = usePostHog();
@@ -24,44 +36,72 @@ export function TwitchCard() {
 
   const mouseX = useMotionValue(0);
   const mouseY = useMotionValue(0);
-  const boundsRef = React.useRef<DOMRect | null>(null);
+  // Page coordinates so the cached position survives document scroll
+  const boundsRef = React.useRef<{ left: number; top: number } | null>(null);
 
   // 🚀 useCallback removed: React Compiler handles these automatically
   const handleMouseEnter = (e: React.MouseEvent<HTMLAnchorElement>) => {
-    boundsRef.current = e.currentTarget.getBoundingClientRect();
+    const rect = e.currentTarget.getBoundingClientRect();
+    boundsRef.current = {
+      left: rect.left + window.scrollX,
+      top: rect.top + window.scrollY,
+    };
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLAnchorElement>) => {
     if (!boundsRef.current) return;
     const { left, top } = boundsRef.current;
-    mouseX.set(e.clientX - left);
-    mouseY.set(e.clientY - top);
+    mouseX.set(e.pageX - left);
+    mouseY.set(e.pageY - top);
   };
 
   const handleMouseLeave = () => {
     boundsRef.current = null;
   };
 
-  const { data, error } = useSWR(`/api/twitch?channel=${channel}`, fetcher, {
-    refreshInterval: 60000,
-    revalidateOnFocus: true,
-    shouldRetryOnError: false,
-  });
+  const { data, error } = useSWR<TwitchStatus, TwitchFetchError>(
+    `/api/twitch?channel=${channel}`,
+    fetcher,
+    {
+      refreshInterval: 60000,
+      revalidateOnFocus: true,
+      // Tab switching shouldn't eat the proxy's 10 req/min /api budget
+      focusThrottleInterval: 30000,
+      // SWR pauses refreshInterval while an error is cached, so retry on the
+      // same 60 s cadence (matches the proxy's Retry-After: 60) to keep polling
+      onErrorRetry: (_err, _key, _config, revalidate, { retryCount }) => {
+        setTimeout(() => revalidate({ retryCount }), 60000);
+      },
+    },
+  );
 
   React.useEffect(() => {
-    if (error) {
-      logger.error(error, {
-        tags: { component: "TwitchCard", issue: "swr_fetch_failed" },
+    if (!error) return;
+    // An HTTP status means the route answered: 429 is the proxy limiter and
+    // 5xx is already reported server-side, so don't raise a second exception
+    if (error.status) {
+      logger.warn("Twitch status request failed", {
+        tags: {
+          component: "TwitchCard",
+          issue: "swr_http_error",
+          status: String(error.status),
+        },
       });
+      return;
     }
+    logger.error(error, {
+      tags: { component: "TwitchCard", issue: "swr_fetch_failed" },
+    });
   }, [error]);
 
+  // SWR keeps the last good data on a failed revalidation: show it rather than
+  // flipping a live stream to Offline; fall back to offline only with no data
   let isLive: boolean | null = null;
 
-  if (error) {
-    isLive = false;
-  } else if (data !== undefined) {
+  if (data !== undefined) {
     isLive = data.isLive === true;
+  } else if (error) {
+    isLive = false;
   }
 
   const glareBackground = useMotionTemplate`
@@ -90,7 +130,7 @@ export function TwitchCard() {
     return (
       <div className="w-full animate-pulse">
         <div className="group relative block w-full overflow-hidden rounded-3xl border border-zinc-200/50 bg-white/60 shadow-xl dark:border-zinc-800/50 dark:bg-[#030303]">
-          <div className="relative h-32 w-full overflow-hidden bg-zinc-200 dark:bg-zinc-900">
+          <div className="relative h-32 w-full overflow-hidden bg-zinc-200 short:h-24 dark:bg-zinc-900">
             <Image
               src={profileData.bannerUrl}
               alt={`${channel} Twitch Banner`}
@@ -102,8 +142,8 @@ export function TwitchCard() {
               fetchPriority="high"
             />
           </div>
-          <div className="relative -mt-5 flex flex-col items-center px-6 pb-6 text-center">
-            <div className="mb-4 h-7 w-24 rounded-full bg-zinc-300 dark:bg-zinc-800" />
+          <div className="relative -mt-5 flex flex-col items-center px-6 pb-6 text-center short:pb-4">
+            <div className="mb-5 h-7 w-24 rounded-full bg-zinc-300 short:mb-3 dark:bg-zinc-800" />
             <div className="flex w-full items-center justify-between gap-4">
               <div className="flex items-center gap-4">
                 <div className="h-14 w-14 rounded-2xl bg-zinc-300 dark:bg-zinc-800" />
@@ -121,7 +161,9 @@ export function TwitchCard() {
   }
 
   return (
-    <div className="w-full animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700">
+    // Short crossfade from the skeleton; the entrance itself lives on the
+    // wrapper in page-client (a delay here left a 500 ms blank gap)
+    <div className="w-full animate-in fade-in duration-300">
       <a
         href={`https://twitch.tv/${channel}`}
         target="_blank"
@@ -138,7 +180,7 @@ export function TwitchCard() {
             : "border-zinc-200/50 bg-white/60 shadow-xl hover:border-zinc-300 hover:shadow-2xl dark:border-zinc-800/50 dark:bg-[#030303] dark:hover:border-zinc-700",
         )}
       >
-        <div className="relative h-32 w-full overflow-hidden bg-zinc-100 dark:bg-zinc-950">
+        <div className="relative h-32 w-full overflow-hidden bg-zinc-100 short:h-24 dark:bg-zinc-950">
           <Image
             src={profileData.bannerUrl}
             alt={`${channel} Twitch Banner`}
@@ -162,8 +204,8 @@ export function TwitchCard() {
           style={{ background: glareBackground }}
         />
 
-        <div className="relative z-20 -mt-5 flex flex-col items-center px-6 pb-6 text-center">
-          <div className="mb-5 h-7">
+        <div className="relative z-20 -mt-5 flex flex-col items-center px-6 pb-6 text-center short:pb-4">
+          <div className="mb-5 h-7 short:mb-3">
             <AnimatePresence mode="wait">
               {isLive ? (
                 <motion.div
@@ -177,7 +219,8 @@ export function TwitchCard() {
                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-red-400 opacity-75"></span>
                     <span className="relative inline-flex h-2.5 w-2.5 rounded-full bg-red-500 shadow-[0_0_10px_rgba(239,68,68,0.8)]"></span>
                   </span>
-                  <span className="text-xs font-black uppercase tracking-[0.2em] text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.3)] dark:text-red-400 dark:drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
+                  {/* red-700 (no light glow): the badge is translucent over the banner, red-600 fell under 4.5:1 */}
+                  <span className="text-xs font-black uppercase tracking-[0.2em] text-red-700 dark:text-red-400 dark:drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
                     Live Now
                   </span>
                 </motion.div>
@@ -186,7 +229,7 @@ export function TwitchCard() {
                   key="offline"
                   initial={{ opacity: 0 }}
                   animate={{ opacity: 1 }}
-                  className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-5 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 shadow-sm backdrop-blur-md transition-colors group-hover:border-zinc-300 group-hover:text-zinc-700 dark:border-zinc-700/50 dark:bg-zinc-800/60 dark:text-zinc-500 dark:shadow-none dark:group-hover:border-zinc-600 dark:group-hover:text-zinc-400"
+                  className="flex items-center gap-2 rounded-full border border-zinc-200 bg-white/80 px-5 py-1.5 text-xs font-bold uppercase tracking-[0.2em] text-zinc-500 shadow-sm backdrop-blur-md transition-colors group-hover:border-zinc-300 group-hover:text-zinc-700 dark:border-zinc-700/50 dark:bg-zinc-800/60 dark:text-zinc-400 dark:shadow-none dark:group-hover:border-zinc-600 dark:group-hover:text-zinc-300"
                 >
                   Offline
                 </motion.div>

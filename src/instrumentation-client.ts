@@ -1,3 +1,4 @@
+// src/instrumentation-client.ts
 // This file configures the initialization of Sentry on the client.
 // The added config here will be used whenever a users loads a page in their browser.
 // https://docs.sentry.io/platforms/javascript/guides/nextjs/
@@ -7,17 +8,15 @@ import * as Sentry from "@sentry/nextjs";
 Sentry.init({
   dsn: process.env.NEXT_PUBLIC_SENTRY_DSN,
 
-  // Add optional integrations for additional features
+  // Session Replay was removed: with replaysOnErrorSampleRate 1.0 it recorded
+  // every visit in the background (~57 KB gzip plus main-thread work) on a
+  // one-screen link page. Errors still arrive with full stack traces.
   integrations: [
-    Sentry.replayIntegration({
-      // Masks text and images by default for user privacy.
-      // Set to false if you want to see exactly what they see.
-      maskAllText: true,
-      blockAllMedia: true,
-    }),
     Sentry.feedbackIntegration({
-      // Additional SDK configuration goes in here, for example:
       colorScheme: "system",
+      // No floating button (it covered the support card on phones); the
+      // footer's FeedbackButton opens the form via getFeedback().attachTo()
+      autoInject: false,
     }),
     Sentry.consoleLoggingIntegration({
       levels: ["log", "info", "warn", "error"],
@@ -28,14 +27,6 @@ Sentry.init({
   tracesSampleRate: 1,
   // Enable logs to be sent to Sentry
   enableLogs: true,
-
-  // Define how likely Replay events are sampled.
-  // This sets the sample rate to be 10%. You may want this to be 100% while
-  // in development and sample at a lower rate in production
-  replaysSessionSampleRate: 0.1,
-
-  // Define how likely Replay events are sampled when an error occurs.
-  replaysOnErrorSampleRate: 1.0,
 
   // Enable sending user PII (Personally Identifiable Information)
   // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii

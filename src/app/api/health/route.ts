@@ -1,50 +1,42 @@
 // src/app/api/health/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, connection } from "next/server";
 import { logger } from "@/lib/logger";
+import { flushSentryAfterResponse } from "@/lib/sentry-flush";
 
-export async function GET(request: Request) {
+export async function GET() {
   try {
-    // Reading the request URL guarantees this bypasses the static build cache
-    const url = new URL(request.url);
-    const clientPing = url.searchParams.get("t") || "automated-ping";
+    // Without request data this handler would be prerendered at build time
+    // (Cache Components); connection() keeps it running per request
+    await connection();
+    // after() needs a request scope, so register the flush once we're dynamic
+    flushSentryAfterResponse();
 
-    // Calculate precise container RAM usage
+    // Proactive Infrastructure Monitoring (reported to Sentry, not to the caller)
     const memoryUsage = process.memoryUsage();
-    const formatMemoryUsage = (bytes: number) =>
-      `${Math.round(bytes / 1024 / 1024)} MB`;
-
-    const healthMetrics = {
-      status: "healthy",
-      environment: process.env.NODE_ENV || "development",
-      timestamp: new Date().toISOString(),
-      uptime: `${Math.round(process.uptime())} seconds`,
-      memory: {
-        rss: formatMemoryUsage(memoryUsage.rss),
-        heapTotal: formatMemoryUsage(memoryUsage.heapTotal),
-        heapUsed: formatMemoryUsage(memoryUsage.heapUsed),
-      },
-      host: url.host,
-      clientPing,
-    };
-
-    // Proactive Infrastructure Monitoring
-    if (memoryUsage.heapUsed / 1024 / 1024 > 500) {
+    const heapUsedMb = Math.round(memoryUsage.heapUsed / 1024 / 1024);
+    if (heapUsedMb > 500) {
       logger.warn("High memory usage detected in container", {
         tags: { layer: "infrastructure", component: "HealthEngine" },
-        extra: { memory: healthMetrics.memory },
+        extra: {
+          heapUsedMb,
+          rssMb: Math.round(memoryUsage.rss / 1024 / 1024),
+        },
       });
     }
 
-    return NextResponse.json(healthMetrics, { status: 200 });
+    // Public endpoint: report liveness only, no runtime details
+    return NextResponse.json(
+      { status: "ok" },
+      { status: 200, headers: { "Cache-Control": "no-store" } },
+    );
   } catch (error) {
-    logger.error("Critical container health check failure", {
+    logger.error(error, {
       tags: { layer: "infrastructure", component: "HealthEngine" },
-      extra: { error },
     });
 
     return NextResponse.json(
-      { status: "unhealthy", message: "Internal Server Error" },
-      { status: 503 },
+      { status: "unhealthy" },
+      { status: 503, headers: { "Cache-Control": "no-store" } },
     );
   }
 }

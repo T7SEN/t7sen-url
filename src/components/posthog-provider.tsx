@@ -13,6 +13,16 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
       defaults: "2026-01-30",
       capture_exceptions: true,
       debug: false,
+      // Tag owner/preview traffic with the $internal_or_test_user person
+      // property: local dev, Vercel preview URLs, and any browser that has
+      // visited the site once with ?internal. PostHog only excludes it once
+      // the cohort filter described in SKILL.md (Analytics) is set up.
+      internal_or_test_user_hostname: /^(localhost|127\.0\.0\.1|.*\.vercel\.app)$/,
+      loaded: (ph) => {
+        if (new URLSearchParams(window.location.search).has("internal")) {
+          ph.setInternalOrTestUser();
+        }
+      },
     });
   }, []);
 

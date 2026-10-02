@@ -6,6 +6,7 @@ import {
   m as motion,
   useMotionTemplate,
   useMotionValue,
+  useReducedMotion,
   useSpring,
 } from "motion/react";
 import { Spotlight } from "@/components/ui/spotlight-new";
@@ -28,7 +29,13 @@ export function SpotlightBackground({
   const smoothX = useSpring(mouseX, { stiffness: 50, damping: 20, mass: 0.5 });
   const smoothY = useSpring(mouseY, { stiffness: 50, damping: 20, mass: 0.5 });
 
+  // With reduced motion the glow stays put instead of following the cursor.
+  // Gated in the effect (not in render) so server and client markup match.
+  const reduceMotion = useReducedMotion();
+
   React.useEffect(() => {
+    if (reduceMotion) return;
+
     const handleMouseMove = (e: MouseEvent) => {
       mouseX.set(e.clientX);
       mouseY.set(e.clientY);
@@ -37,12 +44,13 @@ export function SpotlightBackground({
     // Attach globally so it tracks regardless of z-index stacking
     window.addEventListener("mousemove", handleMouseMove);
     return () => window.removeEventListener("mousemove", handleMouseMove);
-  }, [mouseX, mouseY]);
+  }, [mouseX, mouseY, reduceMotion]);
 
   return (
     <div
       className={cn(
-        "relative flex min-h-screen w-full flex-col overflow-hidden antialiased transition-colors duration-300",
+        // min-h-dvh: min-h-screen (100vh) adds phantom scroll under mobile toolbars
+        "relative flex min-h-dvh w-full flex-col overflow-hidden antialiased transition-colors duration-300",
         "bg-white dark:bg-black/96",
         className,
       )}

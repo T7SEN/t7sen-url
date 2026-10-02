@@ -1,6 +1,6 @@
 // src/app/layout.tsx
 import type { Metadata } from "next";
-import { Space_Grotesk, Geist_Mono } from "next/font/google";
+import { Space_Grotesk } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
 import { ThemeProvider } from "@/components/theme-provider";
@@ -15,21 +15,20 @@ const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
 });
 
-const geistMono = Geist_Mono({
-  variable: "--font-geist-mono",
-  subsets: ["latin"],
-});
-
-const ogTitle = encodeURIComponent(profileData.name);
-const ogSubtitle = encodeURIComponent("Portfolio & Links");
-const ogImageUrl = `/api/og?title=${ogTitle}&subtitle=${ogSubtitle}`;
+// The OG route renders fixed text from profile.ts (name + ogSubtitle) and
+// ignores query params, so the image URL carries none
+const ogImageUrl = "/api/og";
 
 export const metadata: Metadata = {
   title: `${profileData.name} | Links`,
   description: profileData.bio,
+  // Same production fallback as robots, sitemap and JSON-LD, so a build without
+  // the env var never emits a localhost canonical or og:url
   metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
+    process.env.NEXT_PUBLIC_APP_URL || "https://links.t7sen.com",
   ),
+  // Collapses the *.vercel.app alias and ?utm/?ref variants onto one URL
+  alternates: { canonical: "/" },
   openGraph: {
     type: "website",
     locale: "en_US",
@@ -62,8 +61,12 @@ export default function RootLayout({
       <head>
         <JsonLd />
       </head>
+      {/* Browser extensions inject attributes on <body> before hydration (e.g.
+          inmaintabuse, cz-shortcut-listen). The app never sets body attributes,
+          and this only covers <body> itself, not its children. */}
       <body
-        className={`${spaceGrotesk.variable} ${geistMono.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
+        className={`${spaceGrotesk.variable} min-h-screen antialiased bg-zinc-50 dark:bg-zinc-950 font-sans`}
+        suppressHydrationWarning
       >
         <PostHogProvider>
           <ThemeProvider

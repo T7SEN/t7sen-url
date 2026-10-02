@@ -39,7 +39,7 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
         className={cn(
           // 🚀 Swapped scroll-reveal for pure CSS animate-in
           "animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700",
-          "group relative flex w-full items-center justify-center overflow-hidden rounded-[20px] px-6 py-5 shadow-xl transition-all hover:scale-[1.02]",
+          "group relative flex w-full items-center justify-center overflow-hidden rounded-[20px] px-6 py-5 shadow-xl transition-all hover:scale-[1.02] short:py-4",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           "bg-white/80 border border-zinc-200/50",
           "dark:bg-[#030303] dark:border-transparent",
@@ -56,7 +56,7 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
         />
 
         <div className="absolute top-0 z-0 h-px w-3/4 bg-linear-to-r from-transparent via-cyan-500 to-transparent opacity-30 blur-[2px] transition-opacity duration-500 group-hover:opacity-0 dark:via-cyan-400 dark:opacity-50" />
-        <div className="absolute inset-0 z-0 bg-[radial-gradient(ellipse_at_top,var(--tw-gradient-stops))] from-cyan-500/10 via-transparent to-transparent transition-opacity duration-500 group-hover:opacity-0 dark:from-cyan-900/20" />
+        <div className="absolute inset-0 z-0 bg-radial-[ellipse_at_top] from-cyan-500/10 via-transparent to-transparent transition-opacity duration-500 group-hover:opacity-0 dark:from-cyan-900/20" />
 
         <div className="absolute -left-[50%] top-1/2 z-0 h-40 w-40 -translate-y-1/2 rounded-full bg-blue-600 blur-2xl transition-all duration-600 ease-in group-hover:left-1/2 group-hover:-translate-x-1/2 group-hover:opacity-0" />
         <div className="absolute -right-[50%] top-1/2 z-0 h-40 w-40 -translate-y-1/2 rounded-full bg-red-600 blur-2xl transition-all duration-600 ease-in group-hover:right-1/2 group-hover:translate-x-1/2 group-hover:opacity-0" />

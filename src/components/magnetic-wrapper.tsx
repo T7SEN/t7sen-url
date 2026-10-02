@@ -2,7 +2,12 @@
 "use client";
 
 import * as React from "react";
-import { m as motion, useMotionValue, useSpring } from "motion/react";
+import {
+  m as motion,
+  useMotionValue,
+  useReducedMotion,
+  useSpring,
+} from "motion/react";
 
 interface MagneticWrapperProps {
   children: React.ReactNode;
@@ -14,7 +19,15 @@ export function MagneticWrapper({
   className = "",
 }: MagneticWrapperProps) {
   const ref = React.useRef<HTMLDivElement>(null);
-  const boundsRef = React.useRef<DOMRect | null>(null);
+  // Page coordinates so the cached centre survives document scroll
+  const boundsRef = React.useRef<{
+    left: number;
+    top: number;
+    width: number;
+    height: number;
+  } | null>(null);
+  // MotionConfig's reducedMotion doesn't cover pointer-driven springs
+  const reduceMotion = useReducedMotion();
 
   const x = useMotionValue(0);
   const y = useMotionValue(0);
@@ -27,19 +40,25 @@ export function MagneticWrapper({
   const handleMouseEnter = () => {
     if (ref.current) {
       // Cache geometry once on enter to prevent layout thrashing
-      boundsRef.current = ref.current.getBoundingClientRect();
+      const rect = ref.current.getBoundingClientRect();
+      boundsRef.current = {
+        left: rect.left + window.scrollX,
+        top: rect.top + window.scrollY,
+        width: rect.width,
+        height: rect.height,
+      };
     }
   };
 
   const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
-    if (!boundsRef.current) return;
+    if (reduceMotion || !boundsRef.current) return;
 
-    const { clientX, clientY } = e;
+    const { pageX, pageY } = e;
     // Read from memory cache instead of the DOM
     const { height, width, left, top } = boundsRef.current;
 
-    const middleX = clientX - (left + width / 2);
-    const middleY = clientY - (top + height / 2);
+    const middleX = pageX - (left + width / 2);
+    const middleY = pageY - (top + height / 2);
 
     x.set(middleX * 0.2);
     y.set(middleY * 0.2);

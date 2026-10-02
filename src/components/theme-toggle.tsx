@@ -9,21 +9,26 @@ import posthog from "posthog-js";
 import { logger } from "@/lib/logger";
 
 export function ThemeToggle() {
-  const { theme, setTheme } = useTheme();
+  const { resolvedTheme, setTheme } = useTheme();
 
   // 🚀 useCallback removed: React Compiler handles this automatically
   const toggleTheme = (e: React.MouseEvent) => {
-    const newTheme = theme === "light" ? "dark" : "light";
-    const isDark = theme === "dark";
+    // resolvedTheme maps "system" (every new visitor) to the actual OS theme
+    const isDark = resolvedTheme === "dark";
+    const newTheme = isDark ? "light" : "dark";
 
     posthog.capture("theme_toggled", { theme: newTheme });
 
     logger.info("User toggled application theme", {
       tags: { component: "ThemeToggle" },
-      extra: { previousTheme: theme, newTheme },
+      extra: { previousTheme: resolvedTheme, newTheme },
     });
 
-    if (!document.startViewTransition) {
+    // No circular reveal without View Transitions or when the OS asks for reduced motion
+    if (
+      !document.startViewTransition ||
+      window.matchMedia("(prefers-reduced-motion: reduce)").matches
+    ) {
       setTheme(newTheme);
       return;
     }
@@ -61,7 +66,9 @@ export function ThemeToggle() {
         );
       })
       .catch((err) => {
-        logger.error("View transition failed", { extra: { error: err } });
+        logger.error(err, {
+          tags: { component: "ThemeToggle", action: "view_transition" },
+        });
       });
   };
 
@@ -70,7 +77,7 @@ export function ThemeToggle() {
       variant="ghost"
       size="icon"
       onClick={toggleTheme}
-      className="absolute top-4 right-4 h-10 w-10 rounded-full text-zinc-600 transition-colors hover:bg-zinc-200 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
+      className="h-10 w-10 rounded-full text-zinc-600 transition-colors hover:bg-zinc-200 hover:text-zinc-900 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:text-zinc-400 dark:hover:bg-zinc-800 dark:hover:text-zinc-50"
     >
       <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
       <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />

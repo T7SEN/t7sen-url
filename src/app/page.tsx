@@ -1,29 +1,18 @@
 // src/app/page.tsx
-import { headers } from "next/headers";
-import { Suspense } from "react";
+import { cacheLife } from "next/cache";
 import PageClient from "./page-client";
 
-// 🚀 1. The Dynamic Loader (Streams in at runtime)
-async function DynamicVariantLoader() {
-  // Awaiting headers opts this specific boundary into dynamic runtime rendering
-  const headersList = await headers();
-  const supportVariant = headersList.get("x-ab-variant") || "control";
-
-  // Because we accessed Request data above, reading the Date here is now perfectly legal
-  const currentYear = new Date().getFullYear();
-
-  return (
-    <PageClient supportVariant={supportVariant} currentYear={currentYear} />
-  );
+// The page reads no request data, so it is prerendered and served from the
+// CDN. Under Cache Components a Date read needs 'use cache': the year is
+// cached and the page revalidates daily, so it rolls over within a day of New Year.
+async function getCurrentYear() {
+  "use cache";
+  cacheLife("days");
+  return new Date().getFullYear();
 }
 
-// 🚀 2. The Static Shell (Renders instantly at build time)
-export default function Home() {
-  return (
-    // 🚀 3. The Suspense Boundary
-    // The shell is now completely pure, static, and instantly cacheable at the Edge
-    <Suspense fallback={null}>
-      <DynamicVariantLoader />
-    </Suspense>
-  );
+export default async function Home() {
+  const currentYear = await getCurrentYear();
+
+  return <PageClient currentYear={currentYear} />;
 }

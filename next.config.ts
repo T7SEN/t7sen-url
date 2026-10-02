@@ -2,25 +2,44 @@
 import { withSentryConfig } from "@sentry/nextjs";
 import type { NextConfig } from "next";
 
-// Vercel Web Analytics / Speed Insights load their debug scripts from this
-// origin under `next dev` only; production serves them from /_vercel/* (self).
-const vercelDevScripts =
-  process.env.NODE_ENV === "development" ? " https://va.vercel-scripts.com" : "";
+const isDev = process.env.NODE_ENV === "development";
+// Vercel Toolbar / Comments on preview deployments only
+// (vercel.com/docs/vercel-toolbar/managing-toolbar#using-a-content-security-policy)
+const isPreview = process.env.VERCEL_ENV === "preview";
+// Real Vercel deployments only: `vercel dev` and `vercel env pull` also set
+// VERCEL=1 locally, but with VERCEL_ENV=development
+const isVercelDeployment =
+  process.env.VERCEL_ENV === "production" || isPreview;
 
+// Third-party origins: none in production. PostHog runs through the /ingest
+// rewrite (api_host "/ingest" makes posthog-js send every API and asset
+// request there) and Sentry through the /monitoring tunnel, both same-origin.
 const csp = [
   "default-src 'self'",
-  "script-src 'self' 'unsafe-eval' 'unsafe-inline' " +
-    "https://eu.i.posthog.com https://eu-assets.i.posthog.com" +
-    vercelDevScripts,
+  // 'unsafe-inline': Next's inline bootstrap scripts (nonces would force the
+  // static page to render per request). 'unsafe-eval' is dev-only (React
+  // refresh); production React/Next never eval. Vercel Web Analytics / Speed
+  // Insights load debug scripts from va.vercel-scripts.com under `next dev`
+  // only; production serves them from /_vercel/* (self).
+  "script-src 'self' 'unsafe-inline'" +
+    (isDev ? " 'unsafe-eval' https://va.vercel-scripts.com" : "") +
+    (isPreview ? " https://vercel.live" : ""),
   "worker-src 'self' blob:",
-  "style-src 'self' 'unsafe-inline'",
+  "style-src 'self' 'unsafe-inline'" + (isPreview ? " https://vercel.live" : ""),
+  // https: already covers vercel.live / vercel.com for the preview toolbar
   "img-src 'self' blob: data: https:",
-  "font-src 'self' data:",
+  "font-src 'self' data:" +
+    (isPreview ? " https://vercel.live https://assets.vercel.com" : ""),
   "object-src 'none'",
   "base-uri 'self'",
+  "form-action 'self'",
   "frame-ancestors 'none'",
-  "connect-src 'self' https://eu.i.posthog.com " +
-    "https://eu-assets.i.posthog.com",
+  "connect-src 'self'" +
+    (isPreview ? " https://vercel.live wss://ws-us3.pusher.com" : ""),
+  ...(isPreview ? ["frame-src https://vercel.live"] : []),
+  // Vercel production/preview deployments only (always HTTPS): on a local
+  // http:// `next dev`/`next start` it would upgrade subresources and break
+  ...(isVercelDeployment ? ["upgrade-insecure-requests"] : []),
 ].join("; ");
 
 const securityHeaders = [

@@ -1,86 +1,19 @@
 // src/app/api/twitch/route.ts
-import { NextResponse } from "next/server";
+import { NextResponse, after, type NextRequest } from "next/server";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { logger } from "@/lib/logger";
+import { profileData } from "@/config/profile";
+import { getStreamStatus, TwitchConfigError } from "@/lib/twitch";
+import { flushSentry, flushSentryAfterResponse } from "@/lib/sentry-flush";
+import {
+  posthogCookieName,
+  readPostHogIdentity,
+  serverEventProperties,
+} from "@/lib/posthog-identity";
 
-// In-memory cache for the Twitch App Access Token
-let cachedToken: string | null = null;
-let tokenExpiryTime: number = 0;
+export async function GET(request: NextRequest) {
+  flushSentryAfterResponse();
 
-// Helper: Fetch with a strict timeout to prevent Serverless hanging
-const fetchWithTimeout = async (
-  url: string,
-  options: RequestInit,
-  timeoutMs: number = 5000,
-): Promise<Response> => {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
-
-  try {
-    const response = await fetch(url, {
-      ...options,
-      signal: controller.signal,
-    });
-    clearTimeout(timeoutId);
-    return response;
-  } catch (error) {
-    clearTimeout(timeoutId);
-    throw error;
-  }
-};
-
-// Helper: Securely fetch and cache the OAuth token
-async function getTwitchAccessToken(
-  clientId: string,
-  clientSecret: string,
-): Promise<string> {
-  const now = Date.now();
-
-  if (cachedToken && tokenExpiryTime > now + 300000) {
-    return cachedToken;
-  }
-
-  logger.breadcrumb("Fetching new Twitch access token", "api.twitch.auth");
-
-  const params = new URLSearchParams({
-    client_id: clientId,
-    client_secret: clientSecret,
-    grant_type: "client_credentials",
-  });
-
-  const tokenResponse = await fetchWithTimeout(
-    "https://id.twitch.tv/oauth2/token",
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/x-www-form-urlencoded",
-      },
-      body: params.toString(),
-    },
-    5000,
-  );
-
-  if (!tokenResponse.ok) {
-    throw new Error(`Token fetch failed with status: ${tokenResponse.status}`);
-  }
-
-  const tokenData = await tokenResponse.json();
-
-  if (!tokenData.access_token || !tokenData.expires_in) {
-    throw new Error("Invalid token payload received from Twitch");
-  }
-
-  cachedToken = tokenData.access_token;
-  tokenExpiryTime = now + tokenData.expires_in * 1000;
-
-  logger.info("Successfully acquired Twitch access token", {
-    tags: { layer: "backend", route: "/api/twitch" },
-  });
-
-  return tokenData.access_token;
-}
-
-export async function GET(request: Request) {
   try {
     const { searchParams } = new URL(request.url);
     const channel = searchParams.get("channel");
@@ -104,66 +37,50 @@ export async function GET(request: Request) {
       );
     }
 
-    const clientId = process.env.TWITCH_CLIENT_ID;
-    const clientSecret = process.env.TWITCH_CLIENT_SECRET;
-
-    if (!clientId || !clientSecret) {
-      logger.error("Twitch API Error: Missing OAuth credentials", {
-        tags: { route: "/api/twitch" },
-      });
-      return NextResponse.json(
-        { isLive: false, error: "Server misconfiguration" },
-        { status: 500 },
-      );
+    // Only answer for this site's channel, so the app credentials can't be
+    // used as a free live-status API for arbitrary channels
+    if (channel.toLowerCase() !== profileData.twitchChannel.toLowerCase()) {
+      return NextResponse.json({ error: "Unknown channel" }, { status: 400 });
     }
 
-    const accessToken = await getTwitchAccessToken(clientId, clientSecret);
-
-    logger.breadcrumb(
-      `Fetching stream status for ${channel}`,
-      "api.twitch.data",
-    );
-
-    const streamResponse = await fetchWithTimeout(
-      `https://api.twitch.tv/helix/streams?user_login=${channel}`,
-      {
-        headers: {
-          "Client-ID": clientId,
-          Authorization: `Bearer ${accessToken}`,
-        },
-        next: { revalidate: 60 },
-      },
-      5000,
-    );
-
-    if (!streamResponse.ok) {
-      throw new Error(`Stream fetch failed: ${streamResponse.status}`);
-    }
-
-    const streamData = await streamResponse.json();
-
-    // 🚀 THE UPGRADE: Extract the actual stream object to get the game name
-    const stream =
-      Array.isArray(streamData.data) && streamData.data.length > 0
-        ? streamData.data[0]
-        : null;
-    const isLive = !!stream;
-    const game = stream ? stream.game_name : null;
+    const { isLive, game } = await getStreamStatus(channel);
 
     // Background Analytics Tracking
     try {
-      const forwardedFor = request.headers.get("x-forwarded-for");
-      const ip = forwardedFor ? forwardedFor.split(",")[0] : "unknown-ip";
+      const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
+      // The browser's PostHog ID (its same-origin fetch sends the cookie), never the IP
+      const identity = readPostHogIdentity(
+        token ? request.cookies.get(posthogCookieName(token))?.value : undefined,
+      );
       const posthog = getPostHogClient();
 
       posthog.capture({
-        distinctId: ip,
+        distinctId: identity.distinctId,
         event: "twitch_api_called",
         // 🚀 Track the game in PostHog
-        properties: { channel, is_live: isLive, game },
+        properties: {
+          channel,
+          is_live: isLive,
+          game,
+          ...serverEventProperties(identity),
+        },
       });
 
-      await posthog.shutdown();
+      // Sent after the response: awaiting shutdown() here (up to 30 s with
+      // retries) held every poll's response hostage to PostHog. Capped at 5 s
+      // so a PostHog outage doesn't keep every poll's function alive for 30 s.
+      after(async () => {
+        try {
+          await posthog.shutdown(5000);
+        } catch (analyticsError: unknown) {
+          logger.error(analyticsError, {
+            tags: { component: "PostHogServer" },
+          });
+        } finally {
+          // The route's own flush ran concurrently and may be done already
+          await flushSentry();
+        }
+      });
     } catch (analyticsError: unknown) {
       logger.error(analyticsError, {
         tags: { component: "PostHogServer" },
@@ -201,6 +118,13 @@ export async function GET(request: Request) {
     logger.error(error, {
       tags: { route: "/api/twitch", layer: "backend" },
     });
+
+    if (error instanceof TwitchConfigError) {
+      return NextResponse.json(
+        { isLive: false, error: "Server misconfiguration" },
+        { status: 500 },
+      );
+    }
 
     return NextResponse.json({ isLive: false }, { status: 500 });
   }

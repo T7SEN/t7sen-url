@@ -8,8 +8,8 @@ This version has breaking changes — APIs, conventions, and file structure may 
 
 # t7sen-url — Agent Guide
 
-T7SEN's link-in-bio hub: a single page (profile, live Twitch card, links,
-A/B-tested support card) plus a `/go/<slug>` short-link redirect engine.
+T7SEN's link-in-bio hub: a single fully static page (profile, live Twitch
+card, links, support card) plus a `/go/<slug>` short-link redirect engine.
 For architecture, subsystems, and the full landmines list, read `SKILL.md`
 in the repo root.
 
@@ -36,14 +36,16 @@ before declaring a change done.
 
 ## Layout
 
-- `src/proxy.ts` — `/api/*` firewall + rate limit, `/go/<slug>` redirects, A/B
-  cookie and geo headers.
+- `src/proxy.ts` — `/api/*` firewall + rate limit and `/go/<slug>` redirects
+  (matcher: `/go/*`, `/api/*` only).
 - `src/config/profile.ts` — all profile content and links.
-- `src/app/page.tsx` — static shell + `<Suspense>`; `page-client.tsx` — the
-  visible page.
+- `src/app/page.tsx` — fully static page (footer year via `'use cache'`);
+  `page-client.tsx` — the visible page.
 - `src/app/api/` — `twitch` (live status), `og` (OG image), `health`.
 - `src/components/` — feature components; `ui/` for primitives.
-- `src/lib/logger.ts` — Sentry-backed logger.
+- `src/lib/logger.ts` — Sentry-backed logger; `src/lib/twitch.ts` — Helix
+  live status shared by `/api/twitch` and `/api/og`.
+- `assets/fonts/` — Space Grotesk TTFs (OFL) for the OG image only.
 
 ## Critical rules
 
@@ -53,13 +55,21 @@ before declaring a change done.
 - **`proxy.ts` runs on Node.js only** (Next 16). Do not rename it to
   `middleware.ts` or add an edge runtime export. Its rate limiter is
   per-process and in-memory.
-- **Keep the `page.tsx` shell static.** Request data, `Date`, and randomness
-  belong inside an async component under `<Suspense>`.
+- **Keep `/` fully static.** No `headers()` / `cookies()` in the page; `Date`
+  and randomness only inside a `'use cache'` function (or after request data
+  under `<Suspense>`, which costs a function per view).
 - **Import motion as `m`:** `import { m as motion } from "motion/react"`.
-  The full `motion` component throws under `LazyMotion strict`. Prefer
-  `tw-animate-css` classes for entrance animations.
+  The full `motion` component throws under `LazyMotion strict`. Use
+  `tw-animate-css` classes for entrance animations, and keep
+  `prefers-reduced-motion` working (see SKILL.md Conventions).
 - **No manual `useCallback` / `useMemo`** — React Compiler handles memoization.
 - **New external script/fetch domain → update `csp` in `next.config.ts`.**
+  Production allows no third-party origin today (PostHog via `/ingest`,
+  Sentry via `/monitoring`).
+- **New route handler (or proxy code) → call `flushSentryAfterResponse()`**
+  from `src/lib/sentry-flush.ts`; otherwise its Sentry events are lost on
+  Vercel's Node runtime. Never key PostHog events on the visitor's IP; use
+  `src/lib/posthog-identity.ts`.
 - **Keep `public/avatar.png`** — the OG route cannot read WebP.
 - Do not uncomment the root `instrumentation-client.ts`; PostHog is already
   initialized in `PostHogProvider`.

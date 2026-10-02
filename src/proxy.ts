@@ -1,7 +1,13 @@
 // src/proxy.ts
-import { NextResponse } from "next/server";
+import { NextResponse, userAgent as parseUserAgent } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import * as Sentry from "@sentry/nextjs";
+import { flushSentry, flushSentryAfterResponse } from "@/lib/sentry-flush";
+import {
+  posthogCookieName,
+  readPostHogIdentity,
+  serverEventProperties,
+} from "@/lib/posthog-identity";
 
 // =========================================================
 // 1. DATA DICTIONARIES
@@ -21,22 +27,49 @@ const redirectMap = new Map<string, string>([
 const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
 const WINDOW_MS = 60000; // 1 minute
 const MAX_REQUESTS = 10;
-const BLOCKED_AGENTS = ["python-requests", "curl", "postmanRuntime", "scrapy"];
+// Compared against the lowercased user agent
+const BLOCKED_AGENTS = ["python-requests", "curl", "postmanruntime", "scrapy"];
+// Extra non-human tokens on top of userAgent().isBot (which covers the major
+// unfurlers) and the /\bbot\b/ check: generic HTTP clients and preview fetchers
+const NON_HUMAN_AGENTS = [
+  "bot/",
+  "crawler",
+  "spider",
+  "headless",
+  "python-requests",
+  "curl/",
+  "wget/",
+  "scrapy",
+  "postmanruntime",
+  "http.rb", // Mastodon link previews
+  "go-http-client",
+  "okhttp",
+  "axios/",
+  "node-fetch",
+  "undici",
+  "iframely",
+  "cardyb", // Bluesky link cards
+];
 
 // =========================================================
 // 2. proxy ENGINE
 // =========================================================
 
 export function proxy(request: NextRequest, event: NextFetchEvent) {
+  // Send the console logs and spans Sentry buffered during this invocation
+  flushSentryAfterResponse();
+
   const { pathname } = request.nextUrl;
-  const ip = request.headers.get("x-forwarded-for") || "unknown";
+  // Vercel sets x-real-ip / x-forwarded-for to the connecting client (DNS-only, no proxy in front)
+  const ip =
+    request.headers.get("x-real-ip") ||
+    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
+    "unknown";
   const userAgent = request.headers.get("user-agent")?.toLowerCase() || "";
 
   // 🚀 GLOBAL EXTRACTION: Extract country
-  const country =
-    request.headers.get("cf-ipcountry") ||
-    request.headers.get("x-vercel-ip-country") ||
-    "Global";
+  // cf-ipcountry is no longer trusted: without Cloudflare in front, any client can send it
+  const country = request.headers.get("x-vercel-ip-country") || "Global";
 
   // ---------------------------------------------------------
   // LAYER 1: THE EDGE FIREWALL
@@ -69,16 +102,23 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
     } else {
       record.count += 1;
     }
+
+    // Passed the firewall: hand the request to the route untouched
+    return NextResponse.next();
   }
 
   // ---------------------------------------------------------
   // LAYER 2: THE REDIRECT ENGINE
   // ---------------------------------------------------------
   if (pathname.startsWith("/go/")) {
-    const slug = pathname.replace("/go/", "").toLowerCase();
+    // skipTrailingSlashRedirect leaves "/go/github/" as-is, so strip trailing slashes here
+    const slug = pathname.slice("/go/".length).replace(/\/+$/, "").toLowerCase();
     const destination = redirectMap.get(slug);
 
     if (!destination) {
+      console.warn(
+        `[Edge Redirect] Unknown short link slug: ${slug.slice(0, 64)}`,
+      );
       return NextResponse.redirect(new URL("/", request.url));
     }
 
@@ -86,28 +126,51 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
       `[Edge Redirect] Short Link Clicked: ${slug} (from ${country})`,
     );
 
+    // Every method and agent still gets the redirect; only real clicks are counted
+    const purpose = (
+      request.headers.get("sec-purpose") ||
+      request.headers.get("purpose") ||
+      ""
+    ).toLowerCase();
+    const isHumanClick =
+      request.method === "GET" &&
+      userAgent !== "" && // real browsers always send one
+      !purpose.includes("prefetch") &&
+      !parseUserAgent(request).isBot &&
+      !/\bbot\b/.test(userAgent) && // e.g. "Snap URL Preview Service; bot; ..."
+      !NON_HUMAN_AGENTS.some((token) => userAgent.includes(token));
+
     const posthogToken = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
-    if (posthogToken) {
+    if (posthogToken && isHumanClick) {
+      // The browser's PostHog ID (first-party cookie) instead of the visitor's IP
+      const identity = readPostHogIdentity(
+        request.cookies.get(posthogCookieName(posthogToken))?.value,
+      );
+
       event.waitUntil(
         fetch("https://eu.i.posthog.com/capture/", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({
             api_key: posthogToken,
-            distinct_id: ip,
+            distinct_id: identity.distinctId,
             event: "short_link_clicked",
             properties: {
               slug,
               destination,
               country,
               $current_url: request.url,
+              $referrer: request.headers.get("referer") ?? undefined,
               $lib: "edge-proxy",
+              ...serverEventProperties(identity),
             },
           }),
         }).catch((err) => {
           Sentry.captureException(err, {
             tags: { issue: "posthog_edge_fetch_failed" },
           });
+          // Captured after the response-time flush may have run: flush again
+          return flushSentry();
         }),
       );
     }
@@ -115,44 +178,17 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
     return NextResponse.redirect(destination, 307);
   }
 
-  // ---------------------------------------------------------
-  // LAYER 3 & 4: GEO-PERSONALIZATION & A/B TESTING
-  // ---------------------------------------------------------
-
-  // A/B Test Logic: "support_copy_test"
-  const TEST_NAME = "support_copy_test";
-  const VARIANTS = ["control", "test"]; // Control = "Support the Stream", Test = "Buy Me a Coffee"
-
-  // Read existing cookie, or randomly assign a new variant
-  let variant = request.cookies.get(TEST_NAME)?.value;
-  if (!variant || !VARIANTS.includes(variant)) {
-    variant = VARIANTS[Math.floor(Math.random() * VARIANTS.length)];
-  }
-
-  // Clone headers so we can inject our data
-  const requestHeaders = new Headers(request.headers);
-  requestHeaders.set("x-user-country", country);
-  requestHeaders.set("x-ab-variant", variant); // 🚀 Inject A/B Variant
-
-  // Create the response object
-  const response = NextResponse.next({
-    request: {
-      headers: requestHeaders,
-    },
-  });
-
-  // 🚀 Persist the variant in a cookie so the user sees the same text if they refresh the page
-  response.cookies.set(TEST_NAME, variant, { maxAge: 60 * 60 * 24 * 30 }); // Expires in 30 days
-
-  return response;
+  // Nothing else is matched (see config below); pass through untouched
+  return NextResponse.next();
 }
 
 // =========================================================
 // 3. MATCHER CONFIGURATION
 // =========================================================
-// `_vercel` keeps Vercel Web Analytics / Speed Insights beacons out of the proxy
+// Only the routes that need the proxy: short links and the API firewall. The
+// page itself is static (no A/B test), and static files, /ingest (PostHog),
+// /monitoring (Sentry tunnel) and /_vercel (Web Analytics / Speed Insights)
+// never run it.
 export const config = {
-  matcher: [
-    "/((?!_next/static|_next/image|_vercel|favicon.ico|sitemap.xml|robots.txt).*)",
-  ],
+  matcher: ["/go/:path*", "/api/:path*"],
 };
