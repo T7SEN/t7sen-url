@@ -7,7 +7,7 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: {
       userAgent: "*",
-      allow: "/",
+      allow: ["/", "/api/og"],
       // Block crawlers from indexing internal API routes to save crawl budget
       disallow: "/api/",
     },
