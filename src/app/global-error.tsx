@@ -2,7 +2,8 @@
 "use client";
 
 import * as Sentry from "@sentry/nextjs";
-import Error from "next/error";
+// Named NextError so it doesn't shadow the global Error type in the props
+import NextError from "next/error";
 import { useEffect } from "react";
 
 interface GlobalErrorProps {
@@ -21,7 +22,7 @@ export default function GlobalError({ error }: GlobalErrorProps) {
   return (
     <html lang="en">
       <body>
-        <Error statusCode={500} />
+        <NextError statusCode={500} />
       </body>
     </html>
   );

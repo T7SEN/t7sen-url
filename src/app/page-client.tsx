@@ -17,7 +17,6 @@ import { usePostHog } from "posthog-js/react";
 import { logger } from "@/lib/logger";
 import { ShareProfileButton } from "@/components/share-profile-button";
 import { FeedbackButton } from "@/components/feedback-button";
-import BorderGlow from "@/components/BorderGlow";
 
 export default function PageClient({ currentYear }: { currentYear: number }) {
   const posthog = usePostHog();
@@ -190,13 +189,13 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
         {/* In normal flow at the bottom; it used to be absolute and overlap the support card */}
         <footer className="flex items-center gap-1 py-4 text-xs font-medium text-zinc-500 animate-in fade-in fill-mode-backwards delay-1000 duration-700 short:py-3 dark:text-zinc-400">
           <span>© {currentYear}</span>
-          <span>•</span>
+          <span aria-hidden="true">•</span>
           <span>
             Made with{" "}
             <span className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
               💜{" "}
             </span>
-            by T7SEN
+            by {profileData.name}
           </span>
           <span aria-hidden="true">•</span>
           <FeedbackButton />

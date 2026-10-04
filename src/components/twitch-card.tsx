@@ -15,7 +15,6 @@ import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import useSWR from "swr";
 import { logger } from "@/lib/logger";
-import { twitchChannelUrl } from "@/config/links";
 import { useMinuteClock } from "@/lib/use-minute-clock";
 import type { StreamSchedule } from "@/lib/twitch";
 
@@ -332,7 +331,7 @@ export function TwitchCard() {
     // banner chips via animate-in). The entrance itself lives on the wrapper in page-client.
     <div className="w-full">
       <a
-        href={twitchChannelUrl(channel)}
+        href={profileData.twitchUrl}
         target="_blank"
         rel="noopener noreferrer"
         onMouseEnter={handleMouseEnter}

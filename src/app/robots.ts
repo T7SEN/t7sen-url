@@ -1,8 +1,9 @@
 // src/app/robots.ts
 import { MetadataRoute } from "next";
+import { siteUrl } from "@/config/links";
 
 export default function robots(): MetadataRoute.Robots {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://links.t7sen.com";
+  const appUrl = siteUrl;
 
   return {
     rules: {

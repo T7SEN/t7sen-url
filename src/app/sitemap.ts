@@ -1,8 +1,9 @@
 // src/app/sitemap.ts
 import { MetadataRoute } from "next";
+import { siteUrl } from "@/config/links";
 
 export default function sitemap(): MetadataRoute.Sitemap {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://links.t7sen.com";
+  const appUrl = siteUrl;
 
   // No lastModified: new Date() here made /sitemap.xml a function call on
   // every fetch (Cache Components can't prerender a Date read); without it the

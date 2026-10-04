@@ -70,9 +70,6 @@ export function SpotlightBackground({
         }}
       />
 
-      {/* The Static Grid Layer */}
-      <div className="pointer-events-none absolute inset-0 z-0 bg-grid-black/[0.02] dark:bg-grid-white/[0.02]" />
-
       {/* The Ambient Spotlight Beams */}
       <Spotlight />
 

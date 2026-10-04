@@ -5,6 +5,7 @@ import { join } from "node:path";
 import { ImageResponse } from "next/og";
 import { NextResponse, after } from "next/server";
 import { profileData } from "@/config/profile";
+import { siteUrl } from "@/config/links";
 import { logger } from "@/lib/logger";
 import { getStreamStatus, OFFLINE, type StreamStatus } from "@/lib/twitch";
 import { flushSentry, flushSentryAfterResponse } from "@/lib/sentry-flush";
@@ -120,7 +121,8 @@ export async function GET(request: Request) {
   // site) while the Vercel Firewall only limits per IP. Send any query to the
   // bare URL with a cheap, CDN-cacheable redirect. (Next strips its internal
   // nxtP*/nxtI* params before this, so those still render; the per-IP limit
-  // caps them.)
+  // caps them.) Reading request.url also keeps this handler dynamic: under
+  // Cache Components it would otherwise be prerendered once at build.
   const url = new URL(request.url);
   if (url.search !== "") {
     return NextResponse.redirect(new URL(url.pathname, url), {
@@ -135,9 +137,7 @@ export async function GET(request: Request) {
     const title = profileData.name;
     const subtitle = profileData.ogSubtitle;
 
-    // Reading the request keeps this handler dynamic (never prerendered)
-    const origin = url.origin;
-    const displayHost = new URL(process.env.NEXT_PUBLIC_APP_URL || origin).host;
+    const displayHost = new URL(siteUrl).host;
 
     const [statusResult, avatarSrc, fonts] = await Promise.all([
       getStatusWithinBudget(),

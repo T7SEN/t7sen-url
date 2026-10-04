@@ -39,7 +39,8 @@ before declaring a change done.
 - `src/proxy.ts` — `/go/<slug>` redirects only (matcher: `/go/*`). The
   `/api/*` user-agent block and rate limit live in the Vercel Firewall
   (dashboard, not git; rules in SKILL.md).
-- `src/config/links.ts` — every outbound destination and `/go` slug, once.
+- `src/config/links.ts` — the site URL (`siteUrl`), every outbound
+  destination and `/go` slug (Twitch included), once.
 - `src/config/profile.ts` — all profile content; links via `goUrl(slug)`.
 - `src/app/page.tsx` — fully static page (footer year via `'use cache'`);
   `page-client.tsx` — the visible page.
@@ -80,11 +81,12 @@ before declaring a change done.
   Vercel's Node runtime. Never key PostHog events on the visitor's IP; use
   `src/lib/posthog-identity.ts`.
 - **Keep `public/avatar.png`** — the OG route cannot read WebP.
-- Do not uncomment the root `instrumentation-client.ts`; PostHog is already
-  initialized in `PostHogProvider`.
+- PostHog is initialized only in `PostHogProvider`; don't add a root
+  `instrumentation-client.ts` or a second `posthog.init`.
 - Never commit secrets. Env vars: `NEXT_PUBLIC_APP_URL`, `TWITCH_CLIENT_ID`,
   `TWITCH_CLIENT_SECRET`, `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`,
-  `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_SENTRY_DSN`.
+  `NEXT_PUBLIC_POSTHOG_HOST`, `NEXT_PUBLIC_SENTRY_DSN`, and `SENTRY_AUTH_TOKEN`
+  (build-time source-map upload only).
 
 ## Conventions
 
@@ -93,3 +95,7 @@ tracked click fires a PostHog event (`usePostHog()`, guarded) plus
 `logger.info` with `tags.component`. External links use
 `target="_blank" rel="noopener noreferrer"`. `src/` files start with a
 `// src/path` header comment. Tailwind v4 class names (`bg-linear-to-r`).
+`npm run lint` enforces the header, the motion import, no
+`useCallback`/`useMemo`, error-first `logger.error`, Tailwind v4 gradient
+names, no hardcoded URL `href`s and `rel="noopener noreferrer"` on every
+`target="_blank"`; the focus ring and tracking are on you.

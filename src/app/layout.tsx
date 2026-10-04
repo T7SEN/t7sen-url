@@ -8,6 +8,7 @@ import { MotionProvider } from "@/components/motion-provider";
 import { PostHogProvider } from "@/components/posthog-provider";
 import { profileData } from "@/config/profile";
 import { JsonLd } from "@/components/json-ld";
+import { siteUrl } from "@/config/links";
 import "./globals.css";
 
 const spaceGrotesk = Space_Grotesk({
@@ -24,9 +25,7 @@ export const metadata: Metadata = {
   description: profileData.bio,
   // Same production fallback as robots, sitemap and JSON-LD, so a build without
   // the env var never emits a localhost canonical or og:url
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL || "https://links.t7sen.com",
-  ),
+  metadataBase: new URL(siteUrl),
   // Collapses the *.vercel.app alias and ?utm/?ref variants onto one URL
   alternates: { canonical: "/" },
   openGraph: {

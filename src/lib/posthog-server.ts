@@ -1,3 +1,4 @@
+// src/lib/posthog-server.ts
 import { PostHog } from "posthog-node";
 
 export function getPostHogClient() {

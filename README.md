@@ -1,36 +1,52 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# t7sen-url
 
-## Getting Started
+T7SEN's link-in-bio hub at [links.t7sen.com](https://links.t7sen.com): one
+fully static page (profile, live Twitch card with stream details and the next
+scheduled stream, links, support card) and a `/go/<slug>` short-link redirect
+engine that counts clicks.
 
-First, run the development server:
+Built with Next.js 16 (App Router, Cache Components, React Compiler), React 19,
+Tailwind CSS 4, motion, SWR, PostHog, Sentry and Vercel Web Analytics. Hosted
+on Vercel (Hobby) with the Vercel Firewall guarding `/api`.
+
+## Develop
 
 ```bash
+npm install
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Before calling a change done:
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+npx tsc --noEmit
+npm run lint
+npm run build
+```
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+There are no tests; the build is the correctness gate. `npm run lint` also
+enforces the project conventions (file header comments, `m as motion`, no
+`useCallback`/`useMemo`, error-first `logger.error`, no hardcoded URL `href`s,
+`rel="noopener noreferrer"` on new-tab links).
 
-## Learn More
+## Configuration
 
-To learn more about Next.js, take a look at the following resources:
+Copy the variables into `.env.local` (never commit it):
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+| Variable | Used for |
+|---|---|
+| `NEXT_PUBLIC_APP_URL` | Canonical origin (metadata, JSON-LD, robots, sitemap, OG image, Share button) |
+| `TWITCH_CLIENT_ID`, `TWITCH_CLIENT_SECRET` | Twitch Helix live status and schedule |
+| `NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN`, `NEXT_PUBLIC_POSTHOG_HOST` | Analytics |
+| `NEXT_PUBLIC_SENTRY_DSN` | Error and performance monitoring |
+| `SENTRY_AUTH_TOKEN` | Build only: Sentry source-map upload (org auth token, secret) |
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+Profile text lives in `src/config/profile.ts`; every URL and `/go` slug lives
+in `src/config/links.ts`. Icons for the web manifest are generated from
+`src/app/icon.svg` with `node scripts/generate-icons.mjs`.
 
-## Deploy on Vercel
+## More
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+- [`AGENTS.md`](AGENTS.md): the rules for working in this repo.
+- [`SKILL.md`](SKILL.md): architecture, subsystems, firewall rules and
+  landmines.

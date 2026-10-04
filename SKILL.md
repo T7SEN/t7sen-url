@@ -28,9 +28,12 @@ analytics/telemetry channels run alongside. Small surface, tight coupling.
 - **React 19.2.4**, **TypeScript 5.9**, strict. Path alias `@/*` → `src/*`.
 - **Tailwind CSS 4.2** via `@tailwindcss/postcss`; configured in
   `src/app/globals.css`. No JS config file.
-- **shadcn/ui**, style `base-nova` — mixes `@base-ui/react` (avatar) and
-  `radix-ui` (`Slot` in button). Aceternity registry configured
-  (`spotlight-new.tsx` came from it).
+- **shadcn/ui**, style `base-nova`: shadcn's **Base UI** flavour, so
+  `npx shadcn add <component>` installs `@base-ui/react` again (fine when a
+  component needs it). The only shadcn primitive in use, `ui/button.tsx`, uses
+  `radix-ui`'s `Slot`; `globals.css` imports `shadcn/tailwind.css`. Registries
+  in `components.json`: Aceternity (`spotlight-new.tsx` came from it) and
+  React Bits.
 - **motion 12.38** (`motion/react`) under `LazyMotion strict` + `tw-animate-css`.
 - **SWR 2.4** (Twitch polling only), **next-themes 0.4.6**, **lucide-react**.
 - **Sentry 10.48** (`@sentry/nextjs`), **PostHog** (`posthog-js` 1.364,
@@ -49,8 +52,9 @@ per process.
 src/
 ├── proxy.ts                 /go/<slug> redirects + click tracking (matcher /go only)
 ├── instrumentation.ts       Sentry server/edge registration + onRequestError
-├── instrumentation-client.ts  Sentry browser init (feedback [footer link], logs; no replay) — LIVE
-├── config/links.ts          Every outbound destination + /go slugs (proxy, profile, JSON-LD)
+├── instrumentation-client.ts  Sentry browser init (feedback [footer link], logs; no replay)
+├── config/links.ts          siteUrl, twitchChannel, every destination + /go slug (proxy,
+│                            profile, JSON-LD, metadata, robots, sitemap, OG, Share button)
 ├── config/profile.ts        All profile content: name, bio, links (goUrl), socials, support
 ├── lib/
 │   ├── logger.ts            Sentry-backed logger (info/warn/error/breadcrumb)
@@ -76,12 +80,11 @@ src/
     │   copy-email-button, share-profile-button, feedback-button,
     │   magnetic-wrapper, theme-toggle, icons, json-ld
     ├── motion-provider, posthog-provider, theme-provider
-    └── ui/                  button, avatar (unused), spotlight-background, spotlight-new
+    └── ui/                  button, spotlight-background, spotlight-new
 public/                      avatar.webp, avatar.png (OG only), twitch-banner.webp,
                              icon-192/512.png, icon-maskable-512.png (manifest)
 scripts/generate-icons.mjs   Renders icon.svg onto black tiles → the icon PNGs
 assets/fonts/                Space Grotesk Medium/Bold TTFs + OFL.txt (OG image only)
-instrumentation-client.ts    ROOT copy — fully commented out, dead (see Landmines)
 sentry.server.config.ts, sentry.edge.config.ts
 ```
 
@@ -181,8 +184,12 @@ the content and points links and socials at `goUrl("slug")`, typed against
 `shortLinks.email` (a direct `mailto:`). The proxy builds its redirects from
 `shortLinks` plus `slugAliases` (retired slugs that still redirect:
 `twitter` → `x`), and the JSON-LD `sameAs` lists the real destinations via
-`destinationOf()`. `twitchChannelUrl()` builds the channel link for the card
-and the JSON-LD.
+`destinationOf()`. The Twitch card links to `/go/twitch` like every other
+link (`profileData.twitchUrl`), and `twitchChannel` is defined once in
+`links.ts`. `siteUrl` there is the one canonical origin (`NEXT_PUBLIC_APP_URL`,
+falling back to production) used by metadata, JSON-LD, robots, sitemap, the
+OG domain line and the Share button. Display copy (bio, tagline, job title,
+knowsAbout, share text, OG subtitle) lives in `profile.ts`.
 
 **Twitch live status.** `TwitchCard` polls `/api/twitch?channel=…` via SWR
 (60 s interval, revalidate on focus throttled to 30 s). The fetcher throws on
@@ -417,6 +424,18 @@ font; `font-mono` falls back to Tailwind's default stack).
   `SpotlightBackground` check `useReducedMotion()` in handlers/effects (never
   in render, to avoid hydration mismatches); `ThemeToggle` skips the View
   Transition reveal.
+- **Enforced by `npm run lint`** (project rules in `eslint.config.mjs`, `src/`
+  only): the file header comment (auto-fixable, local rule), no full
+  `motion` / `framer-motion` import, no `useCallback`/`useMemo`, error-first
+  `logger.error`, no `bg-gradient-to-*`, no hardcoded `http(s):`/`mailto:`
+  `href` (as `"…"`, `{"…"}` or a template literal; a URL built elsewhere and
+  passed in a variable isn't caught), and every `target="_blank"` element with
+  a literal `rel` containing both `noopener` and `noreferrer` (a selector, plus
+  `react/jsx-no-target-blank` for forms and spreads). The header rule resolves
+  paths from the repo root, so `npx eslint` run from a subfolder or an editor
+  agrees with `npm run lint`, and its fix replaces a stale or misplaced header
+  instead of adding a second one. The focus ring and tracking conventions
+  below are not linted.
 - **No manual `useCallback` / `useMemo`.** React Compiler is on; commit
   `8eb7666` removed them deliberately.
 - **Every interactive element:** focus ring
@@ -438,14 +457,18 @@ font; `font-mono` falls back to Tailwind's default stack).
 ## Environment variables
 
 ```
-NEXT_PUBLIC_APP_URL                Canonical origin. Used by metadata, JSON-LD,
-                                   robots, sitemap, the OG image's domain line,
-                                   and the Share button's URL (inlined into the
-                                   client bundle at build time).
+NEXT_PUBLIC_APP_URL                Canonical origin, read once as `siteUrl` in
+                                   src/config/links.ts: metadata, JSON-LD, robots,
+                                   sitemap, the OG image's domain line, and the
+                                   Share button (inlined into the client bundle
+                                   at build time). Falls back to production.
 TWITCH_CLIENT_ID / TWITCH_CLIENT_SECRET   Helix client-credentials flow.
 NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN  Browser, proxy, and server PostHog.
 NEXT_PUBLIC_POSTHOG_HOST           posthog-node host (server only).
 NEXT_PUBLIC_SENTRY_DSN             All three Sentry runtimes.
+SENTRY_AUTH_TOKEN                  Build only: source-map upload (org auth token;
+                                   secret). Without it the build still passes
+                                   and skips the upload.
 ```
 
 Missing Twitch credentials → `/api/twitch` returns 500 and the card shows
@@ -462,7 +485,7 @@ reads it to tag preview traffic.
 npm run dev      Dev server
 npm run build    Production build — the real correctness gate
 npm run start    Serve the build
-npm run lint     ESLint 9 (next core-web-vitals + typescript)
+npm run lint     ESLint 9 (next core-web-vitals + typescript + project rules)
 npx tsc --noEmit Type-check (no script defined)
 ```
 
@@ -533,33 +556,26 @@ every change with `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
    Next 16, and its replacement `preload` must not be combined with
    `fetchPriority`.
 
-8. **Two `instrumentation-client.ts` files.** `src/instrumentation-client.ts`
-   (Sentry) is live. The **root** copy is fully commented-out PostHog init and
-   is dead. Do not uncomment it — PostHog is already initialized in
-   `PostHogProvider`, so re-enabling it double-initializes.
+8. **PostHog is initialized once, in `PostHogProvider`.** Don't add a
+   root `instrumentation-client.ts` (or any second `posthog.init`): the PostHog
+   wizard's commented-out copy there was deleted because enabling it
+   double-initialized. `src/instrumentation-client.ts` is Sentry's browser init.
 
-9. **`posthog-setup-report.md` is stale.** It describes `page.tsx` as a client
-   component and lists a `link_clicked` event that no longer exists. Use the
-   event table above as the source of truth.
-
-10. **The dev-only `console.error` patch in `theme-provider.tsx` is
-    intentional.** It suppresses React 19's "Encountered a script" warning
-    from next-themes. Don't remove it, and don't extend it to hide other errors.
+9. **The dev-only `console.error` patch in `theme-provider.tsx` is
+   intentional.** It suppresses React 19's "Encountered a script" warning
+   from next-themes. Don't remove it, and don't extend it to hide other errors.
 
 ## Known tech debt — intentional vs. broken
 
-**Genuine bugs (fix when touching the area):**
-- `bg-grid-black/[0.02]` / `bg-grid-white/[0.02]` in `spotlight-background.tsx`
-  are undefined utilities in Tailwind v4 (they required a v3 plugin) — they
-  render nothing. `mini-svg-data-uri` is a leftover of that plugin.
-- `global-error.tsx` imports `Error` from `next/error`, shadowing the global
-  `Error` type used in its own props interface.
-
-**Dead code:** `components/ui/avatar.tsx`, the `.scroll-reveal` utility in
-`globals.css`, `Icons.code`, the root `instrumentation-client.ts`, and the
-`autoprefixer` and `@tailwindcss/cli` dependencies (unused — Tailwind v4
-handles prefixing). `critters` is installed for `optimizeCss`; verify current
-Next behavior before removing it.
+**Removed in the cleanup (don't bring back):** `BorderGlow.tsx`,
+`ui/avatar.tsx` (and `@base-ui/react`, which only it used; `shadcn add` may
+bring it back legitimately, see Stack), the `.scroll-reveal` utility,
+`Icons.code`, the `bg-grid-*` layer (a Tailwind v3 plugin; it rendered
+nothing), `autoprefixer`, `@tailwindcss/cli`, `mini-svg-data-uri`,
+`experimental.optimizeCss` + `critters` (Next 16 only runs them for Pages
+Router pages), the Sentry `webpack` build options (ignored under Turbopack),
+the root `instrumentation-client.ts` and `posthog-setup-report.md`. `sharp`
+stays: `scripts/generate-icons.mjs` uses it.
 
 **Cost and privacy choices to flag before changing:** `tracesSampleRate: 1`
 in all three Sentry runtimes (server traces are now really delivered, see
@@ -574,8 +590,8 @@ first-party cookie.
 delays and slows its hover transition (left as is so the featured card's
 staged hover reveal keeps its timing).
 
-**Housekeeping:** `README.md` is create-next-app boilerplate;
-`eslint-config-next` (16.2.2) trails `next` (16.2.3).
+**Housekeeping:** `eslint-config-next` (16.2.2) trails `next` (16.2.3); the
+owner chose to keep it pinned for now.
 
 ## Before you finish a change
 
@@ -589,4 +605,5 @@ staged hover reveal keeps its timing).
   effects.
 - New tracked interaction → PostHog event (add it to the event table here) +
   `logger.info`.
-- `npx tsc --noEmit`, `npm run lint`, and `npm run build` all pass.
+- `npx tsc --noEmit`, `npm run lint` (0 problems), and `npm run build` all
+  pass.

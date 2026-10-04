@@ -1,9 +1,9 @@
 // src/components/json-ld.tsx
 import { profileData } from "@/config/profile";
-import { destinationOf, twitchChannelUrl } from "@/config/links";
+import { destinationOf, siteUrl } from "@/config/links";
 
 export function JsonLd() {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://links.t7sen.com";
+  const appUrl = siteUrl;
 
   // 🚀 The Maximum-Strength SEO Graph
   const jsonLd = {
@@ -43,17 +43,12 @@ export function JsonLd() {
         image: `${appUrl}${profileData.avatarUrl}`,
         url: appUrl,
         // 🚀 High-value SEO keywords
-        jobTitle: "Software Architect & Content Creator",
-        knowsAbout: [
-          "Software Engineering",
-          "Gaming",
-          "Web Development",
-          "Content Creation",
-        ],
+        jobTitle: profileData.jobTitle,
+        knowsAbout: profileData.knowsAbout,
         // Every profile the links point at. Real destinations, not the /go
         // short links: sameAs needs absolute URLs of the profiles themselves
         sameAs: [
-          twitchChannelUrl(profileData.twitchChannel),
+          destinationOf(profileData.twitchUrl),
           ...profileData.socials.map((social) => destinationOf(social.url)),
           ...profileData.links.map((link) => destinationOf(link.url)),
         ].filter((url) => !url.startsWith("mailto:")),

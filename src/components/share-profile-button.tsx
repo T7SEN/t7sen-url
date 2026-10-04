@@ -7,6 +7,7 @@ import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import { logger } from "@/lib/logger";
 import { profileData } from "@/config/profile";
+import { siteUrl } from "@/config/links";
 
 export function ShareProfileButton() {
   const [copied, setCopied] = React.useState(false);
@@ -24,7 +25,7 @@ export function ShareProfileButton() {
     e.preventDefault();
     // Share the canonical page, not window.location.href: bio-link visits carry
     // utm_*/fbclid params that would otherwise travel with every share
-    const url = process.env.NEXT_PUBLIC_APP_URL || window.location.origin;
+    const url = siteUrl;
     const title = `${profileData.name} | Links`;
 
     // 1. Try the Native OS Share Sheet first
@@ -32,7 +33,7 @@ export function ShareProfileButton() {
       try {
         await navigator.share({
           title: title,
-          text: `Check out ${profileData.name}'s links!`,
+          text: profileData.shareText,
           url: url,
         });
 

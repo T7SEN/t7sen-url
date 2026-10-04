@@ -1,7 +1,7 @@
 // src/config/profile.ts
 import { Icons } from "@/components/icons";
 import * as React from "react";
-import { goUrl, shortLinks } from "@/config/links";
+import { goUrl, shortLinks, twitchChannel } from "@/config/links";
 
 export interface ProfileLink {
   id: string;
@@ -15,12 +15,20 @@ export interface ProfileLink {
 export interface ProfileConfig {
   name: string;
   twitchChannel: string;
+  /** The Twitch card's link (a /go short link, like every other link) */
+  twitchUrl: string;
   /** Numeric Twitch user ID (never changes on rename); Helix /schedule needs it */
   twitchUserId: string;
   twitchTagline: string;
   /** Subtitle on the /api/og share image (the route takes no text from the URL) */
   ogSubtitle: string;
   bio: string;
+  /** JSON-LD Person.jobTitle */
+  jobTitle: string;
+  /** JSON-LD Person.knowsAbout */
+  knowsAbout: string[];
+  /** Text the Share button passes to the OS share sheet */
+  shareText: string;
   avatarUrl: string;
   bannerUrl: string;
   links: ProfileLink[];
@@ -35,11 +43,20 @@ export interface ProfileConfig {
 
 export const profileData: ProfileConfig = {
   name: "T7SEN",
-  twitchChannel: "it7sen",
+  twitchChannel,
+  twitchUrl: goUrl("twitch"),
   twitchUserId: "518195741",
   twitchTagline: "Building software. Destroying lobbies.",
   ogSubtitle: "Portfolio & Links",
   bio: "Software Architect by day. Streamer & Gamer by night.",
+  jobTitle: "Software Architect & Content Creator",
+  knowsAbout: [
+    "Software Engineering",
+    "Gaming",
+    "Web Development",
+    "Content Creation",
+  ],
+  shareText: "Check out T7SEN's links!",
   avatarUrl: "/avatar.webp",
   bannerUrl: "/twitch-banner.webp",
 

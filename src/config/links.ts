@@ -1,13 +1,27 @@
 // src/config/links.ts
-// Every outbound destination, once. src/proxy.ts builds its /go redirects
-// from shortLinks, profile.ts points the UI at goUrl(slug) (a misspelled slug
-// fails the type-check instead of silently redirecting to "/"), and the
-// JSON-LD lists the real destinations via destinationOf(). No React or icon
-// imports here: the proxy bundles this file.
+// Every URL the site uses, once: its own origin (siteUrl) and every outbound
+// destination. src/proxy.ts builds its /go redirects from shortLinks,
+// profile.ts points the UI at goUrl(slug) (a misspelled slug fails the
+// type-check instead of silently redirecting to "/"), and the JSON-LD lists
+// the real destinations via destinationOf(). No React or icon imports here:
+// the proxy bundles this file.
+
+/**
+ * Canonical origin for metadata, JSON-LD, robots, sitemap, the OG image's
+ * domain line and the Share button. NEXT_PUBLIC_APP_URL is inlined at build
+ * time; the fallback is production, so a build without it never emits a
+ * localhost or preview URL.
+ */
+export const siteUrl =
+  process.env.NEXT_PUBLIC_APP_URL || "https://links.t7sen.com";
+
+/** Twitch login; profileData.twitchChannel and the Helix calls use it. */
+export const twitchChannel = "it7sen";
 
 /** Short-link slugs and where /go/<slug> sends visitors (307). */
 export const shortLinks = {
   website: "https://t7sen.com",
+  twitch: `https://twitch.tv/${twitchChannel}`,
   discord: "https://discord.com/users/170916597156937728",
   instagram: "https://instagram.com/t7me.1",
   github: "https://github.com/t7sen",
@@ -35,9 +49,4 @@ export function destinationOf(url: string): string {
   return Object.hasOwn(shortLinks, slug)
     ? shortLinks[slug as ShortLinkSlug]
     : url;
-}
-
-/** Public Twitch channel page (the card's link and the JSON-LD profile). */
-export function twitchChannelUrl(channel: string): string {
-  return `https://twitch.tv/${channel}`;
 }

@@ -76,7 +76,8 @@ const nextConfig: NextConfig = {
   // 🚀 Cache Components is STABLE (The evolution of PPR)
   cacheComponents: true,
 
-  // 🚀 DigitalOcean optimization: Disable built-in image resizing
+  // Assets ship pre-sized; no image optimization (no Vercel quota, no sharp at
+  // request time)
   images: {
     unoptimized: true,
   },
@@ -88,7 +89,8 @@ const nextConfig: NextConfig = {
       "posthog-js",
       "@sentry/nextjs",
     ],
-    optimizeCss: true,
+    // No optimizeCss: Next 16 only runs it (critters) for Pages Router pages,
+    // so it did nothing in this App Router site
   },
 
   async headers() {
@@ -122,10 +124,6 @@ export default withSentryConfig(nextConfig, {
   silent: !process.env.CI,
   widenClientFileUpload: true,
   tunnelRoute: "/monitoring",
-  webpack: {
-    automaticVercelMonitors: true,
-    treeshake: {
-      removeDebugLogging: true,
-    },
-  },
+  // No `webpack` options: builds use Turbopack, where Sentry ignores them
+  // (debug-statement stripping and Vercel Cron monitors are webpack-only)
 });
