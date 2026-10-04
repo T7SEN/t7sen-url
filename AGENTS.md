@@ -36,28 +36,37 @@ before declaring a change done.
 
 ## Layout
 
-- `src/proxy.ts` — `/api/*` firewall + rate limit and `/go/<slug>` redirects
-  (matcher: `/go/*`, `/api/*` only).
-- `src/config/profile.ts` — all profile content and links.
+- `src/proxy.ts` — `/go/<slug>` redirects only (matcher: `/go/*`). The
+  `/api/*` user-agent block and rate limit live in the Vercel Firewall
+  (dashboard, not git; rules in SKILL.md).
+- `src/config/links.ts` — every outbound destination and `/go` slug, once.
+- `src/config/profile.ts` — all profile content; links via `goUrl(slug)`.
 - `src/app/page.tsx` — fully static page (footer year via `'use cache'`);
   `page-client.tsx` — the visible page.
-- `src/app/api/` — `twitch` (live status), `og` (OG image), `health`.
+- `src/app/api/` — `twitch` (live status + schedule), `og` (OG image),
+  `health`. `src/app/manifest.ts` + `apple-icon.png` — web app manifest
+  and iOS icon (PNGs from `scripts/generate-icons.mjs`).
 - `src/components/` — feature components; `ui/` for primitives.
 - `src/lib/logger.ts` — Sentry-backed logger; `src/lib/twitch.ts` — Helix
-  live status shared by `/api/twitch` and `/api/og`.
+  live status (shared by `/api/twitch` and `/api/og`) and schedule;
+  `src/lib/use-minute-clock.ts` — the time for client components.
 - `assets/fonts/` — Space Grotesk TTFs (OFL) for the OG image only.
 
 ## Critical rules
 
-- **Links live in two places.** Add or rename a link in `profile.ts`
-  (`/go/<slug>`) **and** in `redirectMap` in `proxy.ts`, in the same change.
-  A missing slug silently redirects to `/`.
+- **Links live in `src/config/links.ts`.** Add a destination to `shortLinks`
+  and point `profile.ts` at it with `goUrl("slug")` (a typo fails the
+  type-check); the proxy and the JSON-LD read the same object. Don't hardcode
+  URLs in components. Keep retired slugs in `slugAliases`.
 - **`proxy.ts` runs on Node.js only** (Next 16). Do not rename it to
-  `middleware.ts` or add an edge runtime export. Its rate limiter is
-  per-process and in-memory.
+  `middleware.ts` or add an edge runtime export. **Don't add `/api` back to
+  its matcher**: proxy code runs before the CDN cache, so every cached
+  `/api/twitch` poll would run a function again. API protection belongs in
+  the Vercel Firewall.
 - **Keep `/` fully static.** No `headers()` / `cookies()` in the page; `Date`
   and randomness only inside a `'use cache'` function (or after request data
-  under `<Suspense>`, which costs a function per view).
+  under `<Suspense>`, which costs a function per view). In client components
+  read the time with `useMinuteClock()`, never `Date.now()` in render.
 - **Import motion as `m`:** `import { m as motion } from "motion/react"`.
   The full `motion` component throws under `LazyMotion strict`. Use
   `tw-animate-css` classes for entrance animations, and keep

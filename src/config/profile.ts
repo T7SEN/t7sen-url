@@ -1,10 +1,12 @@
 // src/config/profile.ts
 import { Icons } from "@/components/icons";
 import * as React from "react";
+import { goUrl, shortLinks } from "@/config/links";
 
 export interface ProfileLink {
   id: string;
   title: string;
+  /** goUrl(slug) for tracked short links; destinations live in links.ts */
   url: string;
   icon: React.ElementType;
   isFeatured?: boolean;
@@ -13,6 +15,8 @@ export interface ProfileLink {
 export interface ProfileConfig {
   name: string;
   twitchChannel: string;
+  /** Numeric Twitch user ID (never changes on rename); Helix /schedule needs it */
+  twitchUserId: string;
   twitchTagline: string;
   /** Subtitle on the /api/og share image (the route takes no text from the URL) */
   ogSubtitle: string;
@@ -32,6 +36,7 @@ export interface ProfileConfig {
 export const profileData: ProfileConfig = {
   name: "T7SEN",
   twitchChannel: "it7sen",
+  twitchUserId: "518195741",
   twitchTagline: "Building software. Destroying lobbies.",
   ogSubtitle: "Portfolio & Links",
   bio: "Software Architect by day. Streamer & Gamer by night.",
@@ -42,14 +47,14 @@ export const profileData: ProfileConfig = {
     id: "creators_sa",
     title: "Support the Stream",
     subtitle: "Drop a tip on Creators.sa",
-    url: "/go/support",
+    url: goUrl("support"),
   },
 
   links: [
     {
       id: "website",
       title: "My Site",
-      url: "/go/website",
+      url: goUrl("website"),
       icon: Icons.globe,
       isFeatured: true,
     },
@@ -59,31 +64,31 @@ export const profileData: ProfileConfig = {
     {
       id: "discord",
       title: "Discord",
-      url: "/go/discord",
+      url: goUrl("discord"),
       icon: Icons.discord,
     },
     {
       id: "instagram",
       title: "Instagram",
-      url: "/go/instagram",
+      url: goUrl("instagram"),
       icon: Icons.instagram,
     },
     {
       id: "github",
       title: "GitHub",
-      url: "/go/github",
+      url: goUrl("github"),
       icon: Icons.github,
     },
     {
       id: "twitter",
       title: "Twitter / X",
-      url: "/go/x",
+      url: goUrl("x"),
       icon: Icons.twitter,
     },
     {
       id: "email",
       title: "Email",
-      url: "mailto:hello@t7sen.com",
+      url: shortLinks.email,
       icon: Icons.mail,
     },
   ],

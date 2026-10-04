@@ -2,7 +2,7 @@
 import { NextResponse, userAgent as parseUserAgent } from "next/server";
 import type { NextRequest, NextFetchEvent } from "next/server";
 import * as Sentry from "@sentry/nextjs";
-import { profileData } from "@/config/profile";
+import { shortLinks, slugAliases } from "@/config/links";
 import { flushSentry, flushSentryAfterResponse } from "@/lib/sentry-flush";
 import {
   posthogCookieName,
@@ -14,22 +14,15 @@ import {
 // 1. DATA DICTIONARIES
 // =========================================================
 
+// Built from src/config/links.ts, the single list of destinations (slugs are
+// lowercase there; incoming slugs are lowercased below)
 const redirectMap = new Map<string, string>([
-  ["website", "https://t7sen.com"],
-  ["discord", "https://discord.com/users/170916597156937728"],
-  ["instagram", "https://instagram.com/t7me.1"],
-  ["github", "https://github.com/t7sen"],
-  ["twitter", "https://x.com/T7ME_"],
-  ["x", "https://x.com/T7ME_"],
-  ["support", "https://creators.sa/t7sen"],
-  ["email", "mailto:hello@t7sen.com"],
+  ...Object.entries(shortLinks),
+  ...Object.entries(slugAliases).map(
+    ([alias, slug]): [string, string] => [alias, shortLinks[slug]],
+  ),
 ]);
 
-const rateLimitMap = new Map<string, { count: number; resetTime: number }>();
-const WINDOW_MS = 60000; // 1 minute
-const MAX_REQUESTS = 10;
-// Compared against the lowercased user agent
-const BLOCKED_AGENTS = ["python-requests", "curl", "postmanruntime", "scrapy"];
 // Extra non-human tokens on top of userAgent().isBot (which covers the major
 // unfurlers) and the /\bbot\b/ check: generic HTTP clients and preview fetchers
 const NON_HUMAN_AGENTS = [
@@ -61,11 +54,6 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
   flushSentryAfterResponse();
 
   const { pathname } = request.nextUrl;
-  // Vercel sets x-real-ip / x-forwarded-for to the connecting client (DNS-only, no proxy in front)
-  const ip =
-    request.headers.get("x-real-ip") ||
-    request.headers.get("x-forwarded-for")?.split(",")[0]?.trim() ||
-    "unknown";
   const userAgent = request.headers.get("user-agent")?.toLowerCase() || "";
 
   // 🚀 GLOBAL EXTRACTION: Extract country
@@ -73,56 +61,7 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
   const country = request.headers.get("x-vercel-ip-country") || "Global";
 
   // ---------------------------------------------------------
-  // LAYER 1: THE EDGE FIREWALL
-  // ---------------------------------------------------------
-  if (pathname.startsWith("/api/")) {
-    if (BLOCKED_AGENTS.some((bot) => userAgent.includes(bot))) {
-      console.warn(
-        `[Edge Firewall] Blocked malicious agent: ${userAgent} from IP: ${ip}`,
-      );
-      return new NextResponse("Forbidden", { status: 403 });
-    }
-
-    // The TwitchCard's exact poll URL skips the per-IP budget: visitors sharing
-    // one IP (NAT, carrier CGNAT) all poll it every minute, and an 11th tab got
-    // a 429. That URL is CDN-cached for 60 s and src/lib/twitch.ts memoises
-    // Helix for 30 s, so the budget protected little. Any other query (extra
-    // or reordered params, other casing) misses the CDN cache, so it keeps the
-    // budget.
-    if (
-      pathname === "/api/twitch" &&
-      request.nextUrl.search === `?channel=${profileData.twitchChannel}`
-    ) {
-      return NextResponse.next();
-    }
-
-    const now = Date.now();
-
-    if (rateLimitMap.size > 1000) {
-      for (const [key, value] of rateLimitMap.entries()) {
-        if (now > value.resetTime) rateLimitMap.delete(key);
-      }
-    }
-
-    const record = rateLimitMap.get(ip);
-    if (!record || now > record.resetTime) {
-      rateLimitMap.set(ip, { count: 1, resetTime: now + WINDOW_MS });
-    } else if (record.count >= MAX_REQUESTS) {
-      console.warn(`[Edge Firewall] Rate Limit Exceeded: ${ip}`);
-      return NextResponse.json(
-        { error: "Too Many Requests" },
-        { status: 429, headers: { "Retry-After": "60" } },
-      );
-    } else {
-      record.count += 1;
-    }
-
-    // Passed the firewall: hand the request to the route untouched
-    return NextResponse.next();
-  }
-
-  // ---------------------------------------------------------
-  // LAYER 2: THE REDIRECT ENGINE
+  // THE REDIRECT ENGINE
   // ---------------------------------------------------------
   if (pathname.startsWith("/go/")) {
     // skipTrailingSlashRedirect leaves "/go/github/" as-is, so strip trailing slashes here
@@ -210,10 +149,12 @@ export function proxy(request: NextRequest, event: NextFetchEvent) {
 // =========================================================
 // 3. MATCHER CONFIGURATION
 // =========================================================
-// Only the routes that need the proxy: short links and the API firewall. The
-// page itself is static (no A/B test), and static files, /ingest (PostHog),
-// /monitoring (Sentry tunnel) and /_vercel (Web Analytics / Speed Insights)
-// never run it.
+// Short links only. The /api/* user-agent block and per-IP rate limit moved to
+// the Vercel Firewall (rules listed in SKILL.md), which runs before the CDN
+// cache and costs nothing for what it blocks: with /api/* matched here, every
+// /api/twitch poll ran this function even when the CDN answered from cache.
+// The page, static files, /api, /ingest (PostHog), /monitoring (Sentry tunnel)
+// and /_vercel (Web Analytics / Speed Insights) never run it.
 export const config = {
-  matcher: ["/go/:path*", "/api/:path*"],
+  matcher: ["/go/:path*"],
 };

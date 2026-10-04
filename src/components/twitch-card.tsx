@@ -15,9 +15,147 @@ import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
 import useSWR from "swr";
 import { logger } from "@/lib/logger";
+import { twitchChannelUrl } from "@/config/links";
+import { useMinuteClock } from "@/lib/use-minute-clock";
+import type { StreamSchedule } from "@/lib/twitch";
 
-type TwitchStatus = { isLive: boolean; game?: string | null };
+// Fields beyond isLive are optional: the route's timeout fallback sends only
+// { isLive: false }
+type TwitchStatus = {
+  isLive: boolean;
+  game?: string | null;
+  title?: string | null;
+  startedAt?: string | null;
+  schedule?: StreamSchedule | null;
+};
 type TwitchFetchError = Error & { status?: number };
+
+type BannerChip = { key: string; strong?: boolean; content: React.ReactNode };
+
+const MINUTE_MS = 60_000;
+const DAY_MS = 24 * 60 * MINUTE_MS;
+
+// Page language, visitor's own time zone (Helix has no utc_offset support)
+const weekdayTime = new Intl.DateTimeFormat("en", {
+  weekday: "short",
+  hour: "numeric",
+  minute: "2-digit",
+});
+const dayAndTime = new Intl.DateTimeFormat("en", {
+  month: "short",
+  day: "numeric",
+  hour: "numeric",
+  minute: "2-digit",
+});
+const dayOnly = new Intl.DateTimeFormat("en", { month: "short", day: "numeric" });
+
+// "2h 14m" (read as "live for 2h 14m"), or "just started" in the first
+// minute and while the visitor's clock is behind Twitch's
+function formatUptime(
+  startedAt: string,
+  now: number,
+): { text: string; isDuration: boolean } | null {
+  const start = Date.parse(startedAt);
+  if (Number.isNaN(start)) return null;
+  const minutes = Math.floor((now - start) / MINUTE_MS);
+  if (minutes < 1) return { text: "just started", isDuration: false };
+  const hours = Math.floor(minutes / 60);
+  return {
+    text: hours > 0 ? `${hours}h ${minutes % 60}m` : `${minutes}m`,
+    isDuration: true,
+  };
+}
+
+// Title, then game and uptime, over the banner while live
+function liveChips(data: TwitchStatus, now: number): BannerChip[] {
+  const chips: BannerChip[] = [];
+  if (data.title) {
+    chips.push({ key: "title", strong: true, content: data.title });
+  }
+  const uptime = data.startedAt ? formatUptime(data.startedAt, now) : null;
+  if (data.game || uptime) {
+    chips.push({
+      key: "meta",
+      content: (
+        <>
+          {data.game}
+          {data.game && uptime && " · "}
+          {uptime && data.startedAt && (
+            <time
+              dateTime={data.startedAt}
+              title={`Live since ${dayAndTime.format(Date.parse(data.startedAt))}`}
+            >
+              {uptime.isDuration && <span className="sr-only">live for </span>}
+              {uptime.text}
+            </time>
+          )}
+        </>
+      ),
+    });
+  }
+  return chips;
+}
+
+// The next scheduled stream (or the vacation) over the banner while offline.
+// Segments come pre-filtered from the server; "next" is picked here with the
+// ticking clock so a cached segment that has ended is never shown.
+function scheduleChips(schedule: StreamSchedule, now: number): BannerChip[] {
+  const vacation = schedule.vacation;
+  const vacationStart = vacation ? Date.parse(vacation.startTime) : NaN;
+  const vacationEnd = vacation ? Date.parse(vacation.endTime) : NaN;
+
+  if (vacation && vacationStart <= now && now < vacationEnd) {
+    return [
+      {
+        key: "vacation",
+        strong: true,
+        content: (
+          <>
+            On a break until{" "}
+            <time dateTime={vacation.endTime}>{dayOnly.format(vacationEnd)}</time>
+          </>
+        ),
+      },
+    ];
+  }
+
+  const next = schedule.segments.find((segment) => {
+    const start = Date.parse(segment.startTime);
+    const end = segment.endTime ? Date.parse(segment.endTime) : start;
+    if (Number.isNaN(start) || end <= now) return false;
+    // Vacation mode doesn't cancel the segments inside it
+    return !(vacation && start >= vacationStart && start < vacationEnd);
+  });
+  if (!next) return [];
+
+  const start = Date.parse(next.startTime);
+  const when =
+    start <= now
+      ? null
+      : // Weekday alone is unambiguous within 6 days; minus an hour so a DST
+        // spring-forward can't stretch it onto today's weekday next week
+        start - now < 6 * DAY_MS - 60 * MINUTE_MS
+        ? weekdayTime.format(start)
+        : dayAndTime.format(start);
+
+  const chips: BannerChip[] = [
+    {
+      key: "next",
+      strong: true,
+      content: when ? (
+        <>
+          Next stream ·{" "}
+          <time dateTime={next.startTime}>{when}</time>
+        </>
+      ) : (
+        "Scheduled now"
+      ),
+    },
+  ];
+  const detail = next.title ?? next.category;
+  if (detail) chips.push({ key: "detail", content: detail });
+  return chips;
+}
 
 // Throw on non-2xx so a 429/500 body never replaces the last known status
 const fetcher = async (url: string): Promise<TwitchStatus> => {
@@ -88,8 +226,8 @@ export function TwitchCard() {
   React.useEffect(() => {
     if (!error) return;
     // An HTTP status means the server answered: 5xx is already reported
-    // server-side (the proxy limiter exempts this route, so a 429 could only
-    // come from the platform), so don't raise a second exception
+    // server-side and a 429 is the Vercel Firewall rate limit (see SKILL.md),
+    // so don't raise a second exception
     if (error.status) {
       logger.warn("Twitch status request failed", {
         tags: {
@@ -110,6 +248,14 @@ export function TwitchCard() {
   // failed: a 5xx, no network) the status is unknown, not offline.
   const isLive: boolean | null = data === undefined ? null : data.isLive === true;
   const isUnknown = data === undefined && error !== undefined;
+
+  // Banner overlay: fixed-height banner, so it never changes the card's size
+  const now = useMinuteClock();
+  let chips: BannerChip[] = [];
+  if (data && now !== null) {
+    if (isLive) chips = liveChips(data, now);
+    else if (data.schedule) chips = scheduleChips(data.schedule, now);
+  }
 
   const glareBackground = useMotionTemplate`
 		radial-gradient(
@@ -182,11 +328,11 @@ export function TwitchCard() {
   return (
     // No fade on this root: the skeleton already showed the channel name,
     // tagline and banner, and re-animating them blinked them out. Only the
-    // parts that change fade in (badge via motion, icon tile and arrow via
-    // animate-in). The entrance itself lives on the wrapper in page-client.
+    // parts that change fade in (badge via motion; icon tile, arrow and
+    // banner chips via animate-in). The entrance itself lives on the wrapper in page-client.
     <div className="w-full">
       <a
-        href={`https://twitch.tv/${channel}`}
+        href={twitchChannelUrl(channel)}
         target="_blank"
         rel="noopener noreferrer"
         onMouseEnter={handleMouseEnter}
@@ -218,6 +364,28 @@ export function TwitchCard() {
             fetchPriority="high"
           />
           <div className="absolute inset-0 bg-linear-to-t from-white/60 via-transparent to-transparent dark:from-[#030303]" />
+
+          {chips.length > 0 && (
+            // Own dark backgrounds keep the white text readable over any part
+            // of the banner in both themes
+            <div className="absolute inset-x-0 top-0 flex flex-col items-start gap-1.5 p-3">
+              {chips.map((chip) => (
+                // Fade on each chip, not the container: an animating parent
+                // becomes a backdrop root and switches the blur off mid-fade.
+                // dir="auto": an Arabic title truncates at its own end.
+                <span
+                  key={chip.key}
+                  dir="auto"
+                  className={cn(
+                    "block max-w-full animate-in fade-in truncate rounded-full bg-black/60 px-3 py-1 text-xs text-white backdrop-blur-md",
+                    chip.strong ? "font-semibold" : "font-medium",
+                  )}
+                >
+                  {chip.content}
+                </span>
+              ))}
+            </div>
+          )}
         </div>
 
         <motion.div

@@ -3,7 +3,7 @@
 import { readFile } from "node:fs/promises";
 import { join } from "node:path";
 import { ImageResponse } from "next/og";
-import { after } from "next/server";
+import { NextResponse, after } from "next/server";
 import { profileData } from "@/config/profile";
 import { logger } from "@/lib/logger";
 import { getStreamStatus, OFFLINE, type StreamStatus } from "@/lib/twitch";
@@ -115,6 +115,20 @@ function loadAvatarDataUrl(): Promise<string | null> {
 export async function GET(request: Request) {
   flushSentryAfterResponse();
 
+  // og:image is the bare /api/og. The CDN keys on the full query string, so
+  // ?v=1, ?v=2... would each be an uncached render (the costliest work on the
+  // site) while the Vercel Firewall only limits per IP. Send any query to the
+  // bare URL with a cheap, CDN-cacheable redirect. (Next strips its internal
+  // nxtP*/nxtI* params before this, so those still render; the per-IP limit
+  // caps them.)
+  const url = new URL(request.url);
+  if (url.search !== "") {
+    return NextResponse.redirect(new URL(url.pathname, url), {
+      status: 308,
+      headers: { "Cache-Control": CACHE_CONTROL },
+    });
+  }
+
   try {
     // Fixed text only: the route used to render ?title=&subtitle= from the URL,
     // so anyone could mint a branded image on this domain
@@ -122,7 +136,7 @@ export async function GET(request: Request) {
     const subtitle = profileData.ogSubtitle;
 
     // Reading the request keeps this handler dynamic (never prerendered)
-    const origin = new URL(request.url).origin;
+    const origin = url.origin;
     const displayHost = new URL(process.env.NEXT_PUBLIC_APP_URL || origin).host;
 
     const [statusResult, avatarSrc, fonts] = await Promise.all([

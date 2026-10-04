@@ -1,5 +1,6 @@
 // src/components/json-ld.tsx
 import { profileData } from "@/config/profile";
+import { destinationOf, twitchChannelUrl } from "@/config/links";
 
 export function JsonLd() {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || "https://links.t7sen.com";
@@ -49,11 +50,12 @@ export function JsonLd() {
           "Web Development",
           "Content Creation",
         ],
-        // Automatically aggregates every link you have
+        // Every profile the links point at. Real destinations, not the /go
+        // short links: sameAs needs absolute URLs of the profiles themselves
         sameAs: [
-          `https://twitch.tv/${profileData.twitchChannel}`,
-          ...profileData.socials.map((social) => social.url),
-          ...profileData.links.map((link) => link.url),
+          twitchChannelUrl(profileData.twitchChannel),
+          ...profileData.socials.map((social) => destinationOf(social.url)),
+          ...profileData.links.map((link) => destinationOf(link.url)),
         ].filter((url) => !url.startsWith("mailto:")),
       },
     ],

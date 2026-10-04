@@ -3,13 +3,46 @@ import { NextResponse, after, type NextRequest } from "next/server";
 import { getPostHogClient } from "@/lib/posthog-server";
 import { logger } from "@/lib/logger";
 import { profileData } from "@/config/profile";
-import { getStreamStatus, TwitchConfigError } from "@/lib/twitch";
+import {
+  getCachedSchedule,
+  getSchedule,
+  getStreamStatus,
+  TwitchConfigError,
+  type StreamSchedule,
+} from "@/lib/twitch";
 import { flushSentry, flushSentryAfterResponse } from "@/lib/sentry-flush";
 import {
   posthogCookieName,
   readPostHogIdentity,
   serverEventProperties,
 } from "@/lib/posthog-identity";
+
+// The schedule is optional on the card: don't hold the live status for a slow
+// Helix /schedule (up to 5 s, more with a token refresh)
+const SCHEDULE_BUDGET_MS = 1500;
+
+async function getScheduleWithinBudget(
+  broadcasterId: string,
+): Promise<StreamSchedule | null> {
+  const schedule = getSchedule(broadcasterId);
+  // A fetch that loses the race still fills the memo for the next request;
+  // flush the warning it may log after the route's own flush ran
+  after(schedule.then(() => flushSentry()));
+
+  let timer: ReturnType<typeof setTimeout> | undefined;
+  const budget = new Promise<StreamSchedule | null>((resolve) => {
+    timer = setTimeout(
+      () => resolve(getCachedSchedule(broadcasterId)),
+      SCHEDULE_BUDGET_MS,
+    );
+  });
+
+  try {
+    return await Promise.race([schedule, budget]);
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export async function GET(request: NextRequest) {
   flushSentryAfterResponse();
@@ -43,7 +76,22 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unknown channel" }, { status: 400 });
     }
 
-    const { isLive, game } = await getStreamStatus(channel);
+    // Only the TwitchCard's exact URL does real work. The CDN keys on the
+    // full query string, so extra or reordered params or other casing would
+    // each miss the cache and reach PostHog (Helix is memoised); the Vercel
+    // Firewall rate limit is per IP only and can't tell these apart. A
+    // partial filter: Next has already stripped its internal nxtP*/nxtI*
+    // params and re-serialised the query, so such variants still pass.
+    if (request.nextUrl.search !== `?channel=${profileData.twitchChannel}`) {
+      return NextResponse.json({ error: "Unsupported query" }, { status: 400 });
+    }
+
+    // The schedule never rejects (null when unknown) and is time-boxed, so a
+    // schedule outage can't delay the status or reach the error branches below
+    const [{ isLive, game, title, startedAt }, schedule] = await Promise.all([
+      getStreamStatus(channel),
+      getScheduleWithinBudget(profileData.twitchUserId),
+    ]);
 
     // Background Analytics Tracking. No token: skip silently like the proxy
     // does (the PostHog constructor throws, which reported a Sentry error on
@@ -91,9 +139,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // 🚀 Return BOTH the live status and the game
+    // Status plus what the card shows: title and start (live), schedule (offline)
     return NextResponse.json(
-      { isLive, game },
+      { isLive, game, title, startedAt, schedule },
       {
         status: 200,
         headers: {

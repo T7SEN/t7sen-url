@@ -7,9 +7,10 @@ description: >-
   analytics, and Sentry. Consult this skill for any work in this repository:
   adding or changing links, editing proxy.ts, the Twitch or OG routes,
   analytics events, animations, theming, CSP, or deployment; debugging
-  build, lint, or runtime errors. Use it even for small edits — links live in
-  two places, proxy.ts is Node-only despite its "Edge" labels, and Cache
-  Components plus LazyMotion strict mode fail in non-obvious ways.
+  build, lint, or runtime errors. Use it even for small edits — links come from src/config/links.ts,
+  /api protection lives in the Vercel Firewall (outside git), proxy.ts is
+  Node-only despite its "Edge" labels, and Cache Components plus LazyMotion
+  strict mode fail in non-obvious ways.
 ---
 
 # t7sen-url
@@ -18,8 +19,8 @@ A single-page link-in-bio site for T7SEN (streamer and developer): profile
 header, live Twitch status card, a featured link, social icons, and a
 support card — plus a server-side `/go/<slug>` short-link redirect engine
 that tracks clicks. The page is prerendered and served from the CDN; the
-proxy only handles `/go` and `/api`, and several analytics/telemetry channels
-run alongside. Small surface, tight coupling.
+proxy only handles `/go`, the Vercel Firewall guards `/api`, and several
+analytics/telemetry channels run alongside. Small surface, tight coupling.
 
 ## Stack (resolved from package-lock.json)
 
@@ -39,40 +40,46 @@ run alongside. Small surface, tight coupling.
 - **npm** (package-lock.json committed).
 
 There is **no database, no auth, no Redis, no persistent store**. All
-server state (rate-limit counters, Twitch OAuth token) is in-memory per
-process.
+server state (Twitch OAuth token, live-status and schedule memos) is in-memory
+per process.
 
 ## Repository structure
 
 ```
 src/
-├── proxy.ts                 Request interception: /api firewall, /go redirects
+├── proxy.ts                 /go/<slug> redirects + click tracking (matcher /go only)
 ├── instrumentation.ts       Sentry server/edge registration + onRequestError
 ├── instrumentation-client.ts  Sentry browser init (feedback [footer link], logs; no replay) — LIVE
-├── config/profile.ts        All profile content: name, bio, links, socials, support
+├── config/links.ts          Every outbound destination + /go slugs (proxy, profile, JSON-LD)
+├── config/profile.ts        All profile content: name, bio, links (goUrl), socials, support
 ├── lib/
 │   ├── logger.ts            Sentry-backed logger (info/warn/error/breadcrumb)
 │   ├── posthog-server.ts    posthog-node client factory
 │   ├── posthog-identity.ts  Browser PostHog ID from its cookie for server-side events
 │   ├── sentry-flush.ts      flushSentryAfterResponse(): Sentry.flush in after() (server-only)
-│   ├── twitch.ts            Helix live status + token cache (used by /api/twitch and /api/og)
+│   ├── twitch.ts            Helix live status (/api/twitch, /api/og) + schedule (/api/twitch)
+│   ├── use-minute-clock.ts  useMinuteClock(): the time for client components, per minute
 │   └── utils.ts             cn()
 ├── app/
 │   ├── layout.tsx           Fonts, metadata, OG URL, JSON-LD, provider tree
 │   ├── page.tsx             Fully static page; footer year via 'use cache' (daily)
 │   ├── page-client.tsx      The entire visible page (client component)
-│   ├── api/twitch/route.ts  Twitch Helix live-status endpoint
+│   ├── api/twitch/route.ts  Live status + title/start + schedule for the card
 │   ├── api/og/route.tsx     Dynamic OG image (live badge aware)
 │   ├── api/health/route.ts  Liveness only ({ status: "ok" }); heap warning → Sentry
 │   ├── error.tsx, global-error.tsx, not-found.tsx
-│   ├── robots.ts, sitemap.ts, icon.svg, globals.css
+│   ├── robots.ts, sitemap.ts, icon.svg, globals.css (all prerendered)
+│   ├── manifest.ts          /manifest.webmanifest (prerendered)
+│   └── apple-icon.png       iOS home-screen icon (generated, see Installability)
 └── components/
     ├── twitch-card, primary-link-card, support-card, profile-header,
     │   copy-email-button, share-profile-button, feedback-button,
     │   magnetic-wrapper, theme-toggle, icons, json-ld
     ├── motion-provider, posthog-provider, theme-provider
     └── ui/                  button, avatar (unused), spotlight-background, spotlight-new
-public/                      avatar.webp, avatar.png (OG only), twitch-banner.webp
+public/                      avatar.webp, avatar.png (OG only), twitch-banner.webp,
+                             icon-192/512.png, icon-maskable-512.png (manifest)
+scripts/generate-icons.mjs   Renders icon.svg onto black tiles → the icon PNGs
 assets/fonts/                Space Grotesk Medium/Bold TTFs + OFL.txt (OG image only)
 instrumentation-client.ts    ROOT copy — fully commented out, dead (see Landmines)
 sentry.server.config.ts, sentry.edge.config.ts
@@ -80,38 +87,51 @@ sentry.server.config.ts, sentry.edge.config.ts
 
 ## Request flow
 
-### 1. `src/proxy.ts` — runs on `/go/*` and `/api/*` only
+### 0. Vercel Firewall — `/api/*` protection (dashboard, not in git)
+
+The WAF runs before routing, the proxy and the CDN cache, and requests it
+denies or rate-limits cost no CDN Request, no transfer and no function. Hobby
+allows 3 custom rules (1 of them a fixed-window rate limit keyed on IP). The
+live rules, in priority order:
+
+1. **Deny scripted clients on /api** — action `deny` (403). Four OR groups,
+   each `path` starts with `/api/` AND `user_agent` contains one of
+   `python-requests`, `curl`, `postmanruntime`, `scrapy` (WAF matching is
+   case-insensitive). An empty User-Agent is not blocked.
+2. **Rate limit /api** — `path` starts with `/api/`; fixed window 60 s,
+   60 requests per IP (counted per region), then the default 429. A visible
+   TwitchCard tab sends 1–3 requests a minute (hidden tabs don't poll), so at
+   worst about 20 tabs behind one shared IP fit. Never use `challenge` on `/api`: the card's fetch can't pass one.
+
+The third slot is free for incidents. Change rules in the dashboard (Firewall
+→ Configure → publish; takes effect in ~300 ms, no deploy) and update this
+list. Keep Bot Protection off or on Log: Challenge may break link unfurlers
+on `/` and `/api/og`. Requests the rate limit allows count against Hobby's
+1M/month rate-limit allowance, alongside the 1M CDN Requests.
+
+### 1. `src/proxy.ts` — runs on `/go/*` only
 
 Next 16 renamed `middleware.ts` → `proxy.ts`, and **proxy runs on the Node.js
 runtime only — Edge is not supported and not configurable.** The file's
-"Edge Firewall" / "Edge Redirect" labels are historical (it was
-`middleware.ts` until commit `e5d0117`). Matcher is
-`["/go/:path*", "/api/:path*"]`: the page, static files, `/ingest` (PostHog),
-`/monitoring` (Sentry tunnel) and `/_vercel` (Vercel analytics) never run it.
-Hosted on Vercel with DNS-only records (no Cloudflare proxy), so the client IP
-comes from `x-real-ip` and the country from `x-vercel-ip-country` →
-`"Global"`. `cf-ipcountry` is deliberately ignored (spoofable without
-Cloudflare in front).
+"Edge Redirect" labels are historical (it was `middleware.ts` until commit
+`e5d0117`). Matcher is `["/go/:path*"]`: the page, static files, `/api`,
+`/ingest` (PostHog), `/monitoring` (Sentry tunnel) and `/_vercel` (Vercel
+analytics) never run it. Proxy code runs before the CDN cache, which is why
+`/api` left the matcher: every cached `/api/twitch` poll used to run it.
+Hosted on Vercel with DNS-only records (no Cloudflare proxy), so the country
+comes from `x-vercel-ip-country` → `"Global"`. `cf-ipcountry` is
+deliberately ignored (spoofable without Cloudflare in front).
 
-- **Layer 1 — `/api/*` firewall.** User-agent blocklist (`BLOCKED_AGENTS`,
-  lowercase) → 403. In-memory per-IP limiter: 10 requests / 60 s across the
-  `/api/*` routes → 429 with `Retry-After: 60`, **except the card's exact poll
-  URL `/api/twitch?channel=<profileData.twitchChannel>`** (visitors behind one
-  NAT/CGNAT IP all poll it every minute and the 11th tab got a 429; that URL
-  is CDN-cached 60 s and memoised 30 s). Any other query on `/api/twitch`
-  misses the CDN cache, so it keeps the budget. Map is
-  swept when it exceeds 1000 keys. Passing requests return
-  `NextResponse.next()` untouched.
-- **Layer 2 — `/go/<slug>` redirects.** Slug is lowercased with trailing
-  slashes stripped (`skipTrailingSlashRedirect` is on) and looked up in
-  `redirectMap`. Unknown slug → `console.warn` + redirect to `/`. Known slug →
-  **307** to the destination for every method and agent; PostHog
-  `short_link_clicked` (raw `fetch` to `eu.i.posthog.com` inside
-  `event.waitUntil`; network errors and non-2xx answers → Sentry) fires only
-  for `GET` requests with a
-  user agent that is not a bot (`userAgent().isBot`, `/\bbot\b/`,
-  `NON_HUMAN_AGENTS`) and not a prefetch (`Sec-Purpose`/`Purpose`), so
-  unfurlers, HEAD probes, crawlers and HTTP clients are not counted.
+**`/go/<slug>` redirects.** `redirectMap` is built from `shortLinks` and
+`slugAliases` in `src/config/links.ts`. The slug is lowercased with trailing
+slashes stripped (`skipTrailingSlashRedirect` is on). Unknown slug →
+`console.warn` + redirect to `/`. Known slug → **307** to the destination
+for every method and agent; PostHog `short_link_clicked` (raw `fetch` to
+`eu.i.posthog.com` inside `event.waitUntil`; network errors and non-2xx
+answers → Sentry) fires only for `GET` requests with a user agent that is
+not a bot (`userAgent().isBot`, `/\bbot\b/`, `NON_HUMAN_AGENTS`) and not a
+prefetch (`Sec-Purpose`/`Purpose`), so unfurlers, HEAD probes, crawlers and
+HTTP clients are not counted.
 
 The former `support_copy_test` A/B test (layers 3 & 4: variant cookie plus
 `x-ab-variant` / `x-user-country` headers) was removed: it never recorded
@@ -153,11 +173,16 @@ support card's entrance sits on its shadowed wrapper in `page-client.tsx`.
 
 ## Subsystems
 
-**Links and content.** All content lives in `src/config/profile.ts`
-(`profileData`). Links and socials point at `/go/<slug>` (except email,
-which is a direct `mailto:`); the real destinations live in `redirectMap`
-in `proxy.ts`. The `twitter` social entry uses `/go/x`; both `twitter` and
-`x` slugs exist in the map.
+**Links and content.** Every outbound destination lives once in
+`src/config/links.ts` (`shortLinks`: slug → URL; no React imports, since the
+proxy bundles it). `src/config/profile.ts` (`profileData`) holds the rest of
+the content and points links and socials at `goUrl("slug")`, typed against
+`shortLinks`, so a misspelled slug fails the type-check; email uses
+`shortLinks.email` (a direct `mailto:`). The proxy builds its redirects from
+`shortLinks` plus `slugAliases` (retired slugs that still redirect:
+`twitter` → `x`), and the JSON-LD `sameAs` lists the real destinations via
+`destinationOf()`. `twitchChannelUrl()` builds the channel link for the card
+and the JSON-LD.
 
 **Twitch live status.** `TwitchCard` polls `/api/twitch?channel=…` via SWR
 (60 s interval, revalidate on focus throttled to 30 s). The fetcher throws on
@@ -180,18 +205,50 @@ route validates the channel (`/^[a-zA-Z0-9_]{2,25}$/`), answers only for
 from `src/lib/twitch.ts`. That helper holds the client-credentials token
 (module scope, refreshed 5 min before expiry, one in-flight refresh shared by
 concurrent requests; on a Helix 401 it clears that token only if it is still
-the cached one, then retries once), calls Helix `/streams` with
-`cache: "no-store"` and a 5 s `AbortController` timeout per call that also
-covers reading the body, and memoises `{ isLive, game }` per instance for
-30 s with one in-flight Helix request shared by concurrent callers. Don't put
+the cached one, then retries once; all of this is `helixGet()`), calls Helix
+`/streams` with `cache: "no-store"` and a 5 s `AbortController` timeout per
+call that also covers reading the body, and memoises
+`{ isLive, game, title, startedAt }` (Helix "" normalised to null) per
+instance for 30 s with one in-flight Helix request shared by concurrent
+callers. `getSchedule(profileData.twitchUserId)` reads Helix `/schedule`
+(by numeric user ID, which survives a rename; `start_time` 12 h back so a
+late stream's slot still counts) with its own 15 min memo: 404 means no
+schedule (a normal state, cached, not logged), canceled and ended segments
+are dropped, so are segments inside a vacation (vacation mode doesn't cancel
+them), up to 3 are kept, and a finished vacation is ignored. It never
+rejects: on a failure it serves the last good schedule for up to an hour,
+else null, and retries after 60 s. It is kept out of `getStreamStatus()` so
+the OG image's budget never waits on it. Don't put
 Helix back on Next's fetch data cache: its stale-while-revalidate served old
-bodies and hid 401s. The route responds with
+bodies and hid 401s. The route answers only the card's exact URL
+`?channel=<twitchChannel>` (anything else is a 400 before any Helix or
+PostHog work: the CDN keys on the full query string, so cache-busting
+variants would otherwise each run the function; a partial filter, since
+Next strips its internal `nxtP*`/`nxtI*` params before the handler sees the
+query), waits at most 1.5 s for the schedule (then the last cached one or
+null; the fetch still finishes in `after()`), and responds with
+`{ isLive, game, title, startedAt, schedule }` and
 `Cache-Control: public, s-maxage=60, stale-while-revalidate=30`. Timeout →
 **200** `{ isLive: false }` (graceful); missing credentials
 (`TwitchConfigError`) or any other failure → 500 `{ isLive: false }` + Sentry.
-Each call also fires server-side PostHog `twitch_api_called` when the
-PostHog token is set (new client per request; `shutdown()` runs in
-`after()`, so the response never waits on PostHog).
+Each call also fires server-side PostHog `twitch_api_called` (channel,
+is_live, game; not the title) when the PostHog token is set (new client per
+request; `shutdown()` runs in `after()`, so the response never waits on
+PostHog).
+
+The card overlays chips on the banner, which has a fixed height, so they
+never change the card's size: while live, the stream title (CSS-truncated,
+shown verbatim per the Twitch Developer Agreement) and "game · uptime";
+while offline, "Next stream · Tue 6:00 PM" (visitor's time zone) plus the
+segment title or category, "Scheduled now" during a slot, or "On a break
+until …" during a vacation. Chips are `dir="auto"` (Arabic titles truncate at
+their own end) and fade in individually (a fading parent would switch off
+their backdrop blur). Nothing shows without a schedule. No viewer
+count (owner's choice) and no Twitch thumbnail (it would be the page's first
+third-party image). Uptime and "next" come from `useMinuteClock()`
+(`src/lib/use-minute-clock.ts`: a `useSyncExternalStore` clock ticking each
+minute, null on the server and during hydration), because `Date.now()` in
+render breaks the purity lint rule and Cache Components prerendering.
 
 **OG image.** `/api/og` renders a 1200×630 `ImageResponse` with **fixed text
 only** (`profileData.name`, `profileData.ogSubtitle`, the Twitch tagline or
@@ -200,7 +257,9 @@ this domain; `layout.tsx` points `og:image` at plain `/api/og`. It calls
 `getStreamStatus()` directly (no self-fetch through the CDN/proxy/firewall),
 capped at 2.5 s so crawlers get an image without the badge rather than a
 timeout; a call that loses that race is kept alive with `after()` so it
-still fills the caches. Game names longer than 36 characters are truncated
+still fills the caches. Any query string gets a CDN-cacheable 308 to the
+bare `/api/og` before rendering (each distinct query would otherwise be an
+uncached render). Game names longer than 36 characters are truncated
 with an ellipsis. The avatar (`public/avatar.png`, since the renderer cannot
 decode WebP) is read from disk once per instance and inlined as a data URL
 (it used to be fetched over HTTP from the request origin, which Vercel
@@ -303,8 +362,31 @@ source-map upload until a new token is issued. Local builds hide the failure
 
 **Health.** `/api/health` returns only `{ status: "ok" }` (`no-store`); it
 calls `connection()` so Cache Components does not prerender it, and warns to
-Sentry above 500 MB heap. Note: it sits behind the proxy firewall (see
-Landmines).
+Sentry above 500 MB heap. It sits behind the Vercel Firewall rules (curl-like
+User-Agents get 403) but no longer runs the proxy.
+
+**Uptime monitoring (outside the repo).** UptimeRobot Free: two keyword
+monitors every 5 min, `https://links.t7sen.com/` (keyword `T7SEN | Links`)
+and `/api/health` (keyword `"status":"ok"`), alerting by email and Discord.
+Its User-Agent (`UptimeRobot/2.0`) passes the firewall and counts as a bot in
+the `/go` click filter. About 17k CDN Requests and 9k function invocations a
+month. Don't monitor `/go/<slug>` with a GET from a checker whose User-Agent
+isn't a bot (fake `short_link_clicked` events), and don't point Sentry Uptime
+at `/api/*`: `robots.txt` disallows it and Sentry can disable the monitor.
+
+**Installability.** `src/app/manifest.ts` (standalone, black
+`theme_color`/`background_color`, icons `/icon-192.png`, `/icon-512.png`,
+`/icon-maskable-512.png`), `src/app/apple-icon.png` (180×180, opaque) and
+`icon.svg` (favicon) are all prerendered. The PNGs come from
+`node scripts/generate-icons.mjs` (sharp renders `icon.svg` onto black
+tiles; the maskable one keeps the logo inside the 40% safe circle): rerun it
+after changing `icon.svg`. Don't generate icons with `ImageResponse`
+(`icon.tsx`): under Cache Components they likely build as uncached functions.
+`layout.tsx` exports `viewport.themeColor` (white / black by OS scheme) and
+`metadata.appleWebApp.title`. Never set `metadata.icons` (Next then drops the
+file-based icon links) or `themeColor` in `metadata` (ignored in Next 16).
+`sitemap.ts` has no `lastModified`: a `new Date()` there made it a function
+per fetch.
 
 **Theming and visuals.** next-themes (`class` attribute, system default).
 `ThemeToggle` uses the View Transitions API for a circular clip-path reveal;
@@ -315,8 +397,10 @@ font; `font-mono` falls back to Tailwind's default stack).
 
 ## Conventions
 
-- **Content changes go through `profile.ts` + `redirectMap`** — never hardcode
+- **Content changes go through `profile.ts` + `links.ts`** — never hardcode
   URLs in components.
+- **Time in client components:** `useMinuteClock()`, never `Date.now()` /
+  `new Date()` during render.
 - **Motion import:** `import { m as motion } from "motion/react"`. Required by
   `LazyMotion strict` (see Landmines).
 - **CSS for entrance animations.** All page entrances (page-client, error,
@@ -387,25 +471,25 @@ every change with `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
 
 ## Landmines — read before editing
 
-1. **Links live in two places.** A link in `profile.ts` points at
-   `/go/<slug>`; the destination lives in `redirectMap` in `proxy.ts`. Add or
-   rename one without the other and the click silently redirects to `/` — no
-   error, no 404.
+1. **Links come from `src/config/links.ts`.** Add the destination to
+   `shortLinks` and use `goUrl("slug")` in `profile.ts`; the proxy and the
+   JSON-LD pick it up. Renaming a slug breaks links already shared: keep the
+   old one in `slugAliases`. Don't import React or icons into `links.ts`
+   (the proxy bundles it).
 
 2. **`proxy.ts` is Node-only.** Do not rename it back to `middleware.ts`, do
    not add `export const runtime = "edge"`, and do not trust its "Edge"
-   comments. Its rate-limit `Map` and the Twitch token cache are **per
-   process** — they reset on every deploy/restart and are not shared across
-   instances. It is a soft limiter, not a security boundary.
+   comments. **Don't add `/api` back to its matcher**: it runs before the CDN
+   cache, so every cached Twitch poll would cost a function again. The Twitch
+   token and memos are **per process** and reset on every deploy/restart.
 
-3. **The firewall covers every `/api/*` route** — including `/api/health` and
-   `/api/og`. Uptime monitors using `curl` or `python-requests` get **403**.
-   The 10 req/min budget is shared per IP across the API routes except the
-   card's exact `/api/twitch` poll URL, which is exempt (shared-IP visitors
-   tripped it; see Layer 1). The OG route calls `src/lib/twitch.ts`
-   directly, never `/api/twitch`. `/api/twitch` answers only for
-   `profileData.twitchChannel`; any other channel is a 400. Every poll still
-   runs the proxy (Routing Middleware runs before the CDN cache).
+3. **API protection lives in the Vercel Firewall, not in git** (rules in
+   Request flow §0). It covers every `/api/*` route, including `/api/health`
+   and `/api/og`: uptime monitors using `curl` or `python-requests` get
+   **403**. The OG route calls `src/lib/twitch.ts` directly, never
+   `/api/twitch`. `/api/twitch` answers only for
+   `profileData.twitchChannel` and only its exact query string; anything else
+   is a 400.
 
 4. **Cache Components rules.** `/` is fully static — keep it that way. Never
    read `cookies()` or `headers()` in the page, and read `Date` /
@@ -468,8 +552,6 @@ every change with `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
 - `bg-grid-black/[0.02]` / `bg-grid-white/[0.02]` in `spotlight-background.tsx`
   are undefined utilities in Tailwind v4 (they required a v3 plugin) — they
   render nothing. `mini-svg-data-uri` is a leftover of that plugin.
-- JSON-LD `sameAs` contains relative `/go/...` URLs; schema.org expects
-  absolute URLs.
 - `global-error.tsx` imports `Error` from `next/error`, shadowing the global
   `Error` type used in its own props interface.
 
@@ -486,7 +568,7 @@ visitor IPs, cookies and headers); no consent banner gates PostHog's
 first-party cookie.
 
 **Intentional — don't "fix":** Twitch timeout returns 200 offline;
-`images.unoptimized`; in-memory state; `ThemeToggle` importing the
+`images.unoptimized`; in-memory state (the WAF does the rate limiting); `ThemeToggle` importing the
 `posthog` singleton (works, though `usePostHog()` is the pattern elsewhere);
 `PrimaryLinkCard` keeping `delay-500 duration-700` on its anchor, which also
 delays and slows its hover transition (left as is so the featured card's
@@ -497,7 +579,9 @@ staged hover reveal keeps its timing).
 
 ## Before you finish a change
 
-- New or renamed link → `profile.ts` **and** `redirectMap` updated together.
+- New link → destination in `links.ts`, `goUrl("slug")` in `profile.ts`;
+  renamed slug → old one in `slugAliases`.
+- Firewall rule changed in the dashboard → Request flow §0 updated.
 - New external domain → `csp` in `next.config.ts`.
 - New data on the page → static or `'use cache'` if at all possible; per-request
   data only in an async component inside `<Suspense>` (costs a function per view).

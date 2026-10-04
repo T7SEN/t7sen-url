@@ -1,5 +1,5 @@
 // src/app/layout.tsx
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Space_Grotesk } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { SpeedInsights } from "@vercel/speed-insights/next";
@@ -49,6 +49,19 @@ export const metadata: Metadata = {
     description: profileData.bio,
     images: [ogImageUrl],
   },
+  // Home-screen label on iOS. Icons come from the file conventions
+  // (icon.svg, apple-icon.png): setting metadata.icons would drop them.
+  appleWebApp: { title: profileData.name },
+};
+
+// Browser UI colour (Chrome on Android, installed app windows): the top of the
+// page is white in light mode and black in dark (SpotlightBackground). Follows
+// the OS scheme, not the in-page theme toggle. Must not go in `metadata`.
+export const viewport: Viewport = {
+  themeColor: [
+    { media: "(prefers-color-scheme: light)", color: "#ffffff" },
+    { media: "(prefers-color-scheme: dark)", color: "#000000" },
+  ],
 };
 
 export default function RootLayout({
