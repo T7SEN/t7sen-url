@@ -11,6 +11,8 @@ on Vercel (Hobby) with the Vercel Firewall guarding `/api`.
 
 ## Develop
 
+Needs Node 24 (`engines` in package.json; Vercel runs 24.x).
+
 ```bash
 npm install
 npm run dev

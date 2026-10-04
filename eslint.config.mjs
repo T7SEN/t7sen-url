@@ -1,3 +1,4 @@
+import { createRequire } from "node:module";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { defineConfig, globalIgnores } from "eslint/config";
@@ -7,6 +8,14 @@ import nextTs from "eslint-config-next/typescript";
 // Paths are relative to this config file (the repo root), not ESLint's cwd,
 // so editors and `npx eslint` run from a subfolder agree with `npm run lint`
 const repoRoot = path.dirname(fileURLToPath(import.meta.url));
+
+// ESLint 10 workaround: eslint-plugin-react 7.37 crashes when it auto-detects
+// the React version (it calls context.getFilename(), removed in ESLint 10).
+// Remove once eslint-config-next ships a fixed plugin (vercel/next.js#89764,
+// jsx-eslint/eslint-plugin-react#3977).
+const { version: reactVersion } = createRequire(import.meta.url)(
+  "react/package.json",
+);
 
 // A bare path comment such as `// src/lib/twitch.ts`
 const PATH_COMMENT = /^src\/\S+$/;
@@ -77,6 +86,7 @@ const fileHeader = {
 const eslintConfig = defineConfig([
   ...nextVitals,
   ...nextTs,
+  { settings: { react: { version: reactVersion } } },
   {
     // The rules in AGENTS.md, enforced instead of remembered
     files: ["src/**/*.{ts,tsx}"],

@@ -5,8 +5,10 @@ import { after } from "next/server";
 import * as Sentry from "@sentry/nextjs";
 
 // after() starts on the response's 'close' event, before Next ends its root
-// request span, and Sentry exports finished spans on a 1 ms debounce. Waiting
-// briefly lets the route's transaction reach the buffer before the flush.
+// request span. Sentry 11 streams spans: each one joins a buffer when it ends
+// and flush() drains that buffer. Waiting briefly lets the root span end and
+// join it; otherwise it waits on an unref'd timer that never fires once the
+// function freezes.
 const SPAN_SETTLE_MS = 50;
 
 /** Flush Sentry now (logs, spans, errors) and wait up to 2 s for delivery. */
@@ -17,7 +19,7 @@ export function flushSentry(): Promise<boolean> {
 /**
  * Flush Sentry once the response has been sent.
  *
- * @sentry/nextjs 10.48 only registers its flush with Vercel's waitUntil on the
+ * @sentry/nextjs (10.48 through 11.4) only registers its flush with Vercel's waitUntil on the
  * Edge runtime (getsentry/sentry-javascript#23087), so on the Node runtime the
  * buffered logs, spans and errors were lost when the function froze. after()
  * runs after the response and Vercel keeps the instance alive until it settles.

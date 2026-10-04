@@ -24,9 +24,14 @@ analytics/telemetry channels run alongside. Small surface, tight coupling.
 
 ## Stack (resolved from package-lock.json)
 
-- **Next.js 16.2.3** — App Router, `cacheComponents: true`, `reactCompiler: true`.
-- **React 19.2.4**, **TypeScript 5.9**, strict. Path alias `@/*` → `src/*`.
-- **Tailwind CSS 4.2** via `@tailwindcss/postcss`; configured in
+- **Next.js 16.3.8** (exact pin) — App Router, `cacheComponents: true`,
+  `reactCompiler: true`. Node **24.x** (`engines` in package.json; Vercel uses
+  it over the dashboard setting).
+- **React 19.3.0** (exact pin; the App Router runs Next's own bundled React
+  canary, so this mostly matters for tooling), **TypeScript 6.0** (`~6.0.3`),
+  strict. Path alias `@/*` → `src/*`. Not TS 7 yet: it ships no compiler API,
+  so `typescript-eslint` (peer `<6.1.0`) can't lint with it.
+- **Tailwind CSS 4.3** via `@tailwindcss/postcss`; configured in
   `src/app/globals.css`. No JS config file.
 - **shadcn/ui**, style `base-nova`: shadcn's **Base UI** flavour, so
   `npx shadcn add <component>` installs `@base-ui/react` again (fine when a
@@ -34,10 +39,10 @@ analytics/telemetry channels run alongside. Small surface, tight coupling.
   `radix-ui`'s `Slot`; `globals.css` imports `shadcn/tailwind.css`. Registries
   in `components.json`: Aceternity (`spotlight-new.tsx` came from it) and
   React Bits.
-- **motion 12.38** (`motion/react`) under `LazyMotion strict` + `tw-animate-css`.
-- **SWR 2.4** (Twitch polling only), **next-themes 0.4.6**, **lucide-react**.
-- **Sentry 10.48** (`@sentry/nextjs`), **PostHog** (`posthog-js` 1.364,
-  `posthog-node` 5.28), EU region.
+- **motion 14** (`motion/react`) under `LazyMotion strict` + `tw-animate-css`.
+- **SWR 2.5** (Twitch polling only), **next-themes 0.4.6**, **lucide-react**.
+- **Sentry 11.4** (`@sentry/nextjs`), **PostHog** (`posthog-js` 1.435,
+  `posthog-node` 5.55), EU region.
 - **Vercel Web Analytics** (`@vercel/analytics` 2.0) and **Speed Insights**
   (`@vercel/speed-insights` 2.0), rendered in `layout.tsx`.
 - **npm** (package-lock.json committed).
@@ -344,19 +349,32 @@ it recorded every visit in the background), the feedback integration with
 `autoInject: false` (the floating button covered the support card on phones;
 the footer's `FeedbackButton` opens the form via
 `Sentry.getFeedback()?.attachTo()`), and console-log capture.
-`sendDefaultPii: true` is kept deliberately in all three runtimes.
+`withSentryConfig` is imported from `@sentry/nextjs/config` (v11). v11
+removed `enableLogs` (logs flow whenever `Sentry.logger` or
+`consoleLoggingIntegration` is used) and `sendDefaultPii`: the default
+`dataCollection` already sends what `sendDefaultPii: true` did (IP, cookies,
+headers, request bodies), which is deliberate here; set `dataCollection` in
+the three `Sentry.init` calls to collect less. v11 also names environments
+`production` / `preview` (v10: `vercel-production` / `vercel-preview`), sends
+spans in batches instead of transaction events, and attaches stack traces to
+`captureMessage`. Since Next 16.3 the proxy function awaits
+`instrumentation.register()`, so `/go` requests now reach Sentry too (logs,
+errors and one trace per click at `tracesSampleRate: 1`); they likely sent
+nothing before. Watch the span quota; a `tracesSampler` in
+`sentry.server.config.ts` can sample the proxy lower.
 `src/lib/logger.ts` wraps `Sentry.logger`; `logger.error(err, ctx)` also calls
 `captureException`.
 
-**Server-side flushing.** `@sentry/nextjs` 10.48 only registers its flush
+**Server-side flushing.** `@sentry/nextjs` (10.48 through 11.4) only registers its flush
 with Vercel's `waitUntil` on the Edge runtime (getsentry/sentry-javascript
 #23087), so on Node the buffered logs, spans and errors were lost when the
 function froze. Every route handler and the proxy call
 `flushSentryAfterResponse()` (`src/lib/sentry-flush.ts`, server-only — don't
 import it from `logger.ts`), which runs `Sentry.flush(2000)` in `after()`
 after a 50 ms pause: `after()` starts on the response's `close` event, before
-Next ends its root request span, and Sentry exports finished spans on a 1 ms
-debounce. `after()` callbacks run concurrently, so other `after()` work that
+Next ends its root request span, and Sentry 11 streams spans (each joins a
+buffer when it ends; `flush()` drains it), so the pause lets the root span
+end first. `after()` callbacks run concurrently, so other `after()` work that
 can still log (the PostHog `shutdown()` in `/api/twitch`, the OG route's
 budget-losing Twitch call) calls `flushSentry()` when it finishes. Server
 traces at `tracesSampleRate: 1` are now delivered, so they count against the
@@ -387,8 +405,10 @@ at `/api/*`: `robots.txt` disallows it and Sentry can disable the monitor.
 `icon.svg` (favicon) are all prerendered. The PNGs come from
 `node scripts/generate-icons.mjs` (sharp renders `icon.svg` onto black
 tiles; the maskable one keeps the logo inside the 40% safe circle): rerun it
-after changing `icon.svg`. Don't generate icons with `ImageResponse`
-(`icon.tsx`): under Cache Components they likely build as uncached functions.
+after changing `icon.svg`. Static PNGs over `ImageResponse` icons
+(`icon.tsx`): Next 16.2 likely built those as uncached functions under Cache
+Components; 16.3 can prerender them, but the committed PNGs need no render
+at all and match `icon.svg` exactly.
 `layout.tsx` exports `viewport.themeColor` (white / black by OS scheme) and
 `metadata.appleWebApp.title`. Never set `metadata.icons` (Next then drops the
 file-based icon links) or `themeColor` in `metadata` (ignored in Next 16).
@@ -485,7 +505,7 @@ reads it to tag preview traffic.
 npm run dev      Dev server
 npm run build    Production build — the real correctness gate
 npm run start    Serve the build
-npm run lint     ESLint 9 (next core-web-vitals + typescript + project rules)
+npm run lint     ESLint 10 (next core-web-vitals + typescript + project rules)
 npx tsc --noEmit Type-check (no script defined)
 ```
 
@@ -579,8 +599,8 @@ stays: `scripts/generate-icons.mjs` uses it.
 
 **Cost and privacy choices to flag before changing:** `tracesSampleRate: 1`
 in all three Sentry runtimes (server traces are now really delivered, see
-Server-side flushing); `sendDefaultPii: true` (kept on purpose: Sentry gets
-visitor IPs, cookies and headers); no consent banner gates PostHog's
+Server-side flushing); Sentry's default `dataCollection` (kept on purpose:
+Sentry gets visitor IPs, cookies and headers, now from `/go` requests too); no consent banner gates PostHog's
 first-party cookie.
 
 **Intentional — don't "fix":** Twitch timeout returns 200 offline;
@@ -590,8 +610,17 @@ first-party cookie.
 delays and slows its hover transition (left as is so the featured card's
 staged hover reveal keeps its timing).
 
-**Housekeeping:** `eslint-config-next` (16.2.2) trails `next` (16.2.3); the
-owner chose to keep it pinned for now.
+**Housekeeping:** `eslint-config-next` is pinned to the exact `next`
+version; bump them together. ESLint 10 needs the `settings.react.version`
+workaround in `eslint.config.mjs` (eslint-plugin-react 7.37 crashes on
+version auto-detection under ESLint 10; remove it once vercel/next.js#89764 is
+fixed), and npm prints three `ERESOLVE overriding peer dependency` warnings
+because eslint-plugin-react, -jsx-a11y and -import don't list ESLint 10 yet
+(harmless; `npm ls` marks eslint "invalid"). `npm audit --omit=dev` is clean;
+the full audit still lists a dev-only `braces` chain (via
+`@next/eslint-plugin-next` and the shadcn CLI) with no fixed release.
+`shadcn` is a devDependency: only `globals.css` imports its CSS, at build
+time. Local Node below 24 prints an `EBADENGINE` warning on install.
 
 ## Before you finish a change
 

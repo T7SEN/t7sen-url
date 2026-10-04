@@ -25,12 +25,10 @@ Sentry.init({
 
   // Define how likely traces are sampled. Adjust this value in production, or use tracesSampler for greater control.
   tracesSampleRate: 1,
-  // Enable logs to be sent to Sentry
-  enableLogs: true,
-
-  // Enable sending user PII (Personally Identifiable Information)
-  // https://docs.sentry.io/platforms/javascript/guides/nextjs/configuration/options/#sendDefaultPii
-  sendDefaultPii: true,
+  // Sentry v11: logs are on whenever Sentry.logger / consoleLoggingIntegration
+  // is used (enableLogs is gone), and the default dataCollection already sends
+  // what sendDefaultPii: true did (IP, cookies, headers, bodies). Set
+  // dataCollection here to collect less.
 });
 
 export const onRouterTransitionStart = Sentry.captureRouterTransitionStart;

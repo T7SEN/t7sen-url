@@ -94,8 +94,8 @@ export async function GET(request: NextRequest) {
     ]);
 
     // Background Analytics Tracking. No token: skip silently like the proxy
-    // does (the PostHog constructor throws, which reported a Sentry error on
-    // every call)
+    // does (posthog-node >= 5.35.9 would build a disabled, no-op client; its
+    // missing-key message only prints in debug mode)
     const token = process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN;
     if (token) {
       try {
@@ -120,6 +120,10 @@ export async function GET(request: NextRequest) {
         // Sent after the response: awaiting shutdown() here (up to 30 s with
         // retries) held every poll's response hostage to PostHog. Capped at 5 s
         // so a PostHog outage doesn't keep every poll's function alive for 30 s.
+        // posthog-node >= 5.48.2 resolves on that timeout instead of rejecting:
+        // it prints a console.error, which consoleLoggingIntegration forwards to
+        // Sentry as an error-level log (one per poll during a PostHog outage),
+        // so the catch only sees other failures.
         after(async () => {
           try {
             await posthog.shutdown(5000);
