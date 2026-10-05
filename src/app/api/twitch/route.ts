@@ -76,10 +76,11 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: "Unknown channel" }, { status: 400 });
     }
 
-    // Only the TwitchCard's exact URL does real work. The CDN keys on the
-    // full query string, so extra or reordered params or other casing would
-    // each miss the cache and reach PostHog (Helix is memoised); the Vercel
-    // Firewall rate limit is per IP only and can't tell these apart. A
+    // Only the page's exact URL (StreamStatusProvider) does real work. The
+    // CDN keys on the full query string, so extra or reordered params or other
+    // casing would each miss the cache and reach PostHog (Helix is memoised);
+    // the Vercel Firewall rate limit is per IP only and can't tell these
+    // apart. A
     // partial filter: Next has already stripped its internal nxtP*/nxtI*
     // params and re-serialised the query, so such variants still pass.
     if (request.nextUrl.search !== `?channel=${profileData.twitchChannel}`) {

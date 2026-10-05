@@ -36,7 +36,8 @@ export function SupportCard({ title, subtitle, url }: SupportCardProps) {
         rel="noopener noreferrer"
         onClick={handleClick}
         className={cn(
-          "group relative flex w-full items-center justify-between overflow-hidden rounded-2xl p-px transition-all duration-500 hover:scale-[1.02]",
+          // active: a quick press on touch screens, released at the base duration
+          "group relative flex w-full items-center justify-between overflow-hidden rounded-2xl p-px transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] active:duration-150",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           "bg-linear-to-b from-zinc-200/50 to-transparent dark:from-zinc-800/50",
           "hover:from-[#9146FF]/50 dark:hover:from-[#9146FF]/50",

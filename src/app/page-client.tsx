@@ -17,6 +17,10 @@ import { usePostHog } from "posthog-js/react";
 import { logger } from "@/lib/logger";
 import { ShareProfileButton } from "@/components/share-profile-button";
 import { FeedbackButton } from "@/components/feedback-button";
+import { LiveAmbience } from "@/components/live-ambience";
+
+// How long the border light stays after a finger lifts (then fades out)
+const TOUCH_LIGHT_MS = 400;
 
 export default function PageClient({ currentYear }: { currentYear: number }) {
   const posthog = usePostHog();
@@ -25,6 +29,7 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
   // Page coordinates (rect + scroll on enter, pageX/pageY on move) so the
   // cached position stays valid when the document scrolls under the pointer
   const boundsRef = useRef<{ left: number; top: number } | null>(null);
+  const touchTimerRef = useRef<ReturnType<typeof setTimeout>>(undefined);
 
   useEffect(() => {
     logger.info("User visited profile landing page", {
@@ -32,23 +37,53 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
     });
   }, []);
 
-  const handleMouseEnter = (e: React.MouseEvent<HTMLDivElement>) => {
-    const rect = e.currentTarget.getBoundingClientRect();
+  useEffect(() => () => clearTimeout(touchTimerRef.current), []);
+
+  const cacheBounds = (card: HTMLDivElement) => {
+    const rect = card.getBoundingClientRect();
     boundsRef.current = {
       left: rect.left + window.scrollX,
       top: rect.top + window.scrollY,
     };
   };
 
-  const handleMouseMove = (e: React.MouseEvent<HTMLDivElement>) => {
+  // Pointer events cover mouse, pen and touch; for touch, enter fires just
+  // before down and leave just after up
+  const handlePointerEnter = (e: React.PointerEvent<HTMLDivElement>) => {
+    cacheBounds(e.currentTarget);
+  };
+
+  const handlePointerMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!boundsRef.current) return;
     const { left, top } = boundsRef.current;
     mouseX.set(e.pageX - left);
     mouseY.set(e.pageY - top);
   };
 
-  const handleMouseLeave = () => {
+  const handlePointerLeave = () => {
     boundsRef.current = null;
+  };
+
+  // Touch screens never hover, so light the border where the finger lands.
+  // data-touch is set on the DOM node directly: a state update here would
+  // re-render the whole page on every touch.
+  const handlePointerDown = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") return;
+    const card = e.currentTarget;
+    if (!boundsRef.current) cacheBounds(card);
+    handlePointerMove(e);
+    clearTimeout(touchTimerRef.current);
+    card.dataset.touch = "";
+  };
+
+  // Also on pointercancel, which fires when the touch turns into a scroll
+  const handlePointerUp = (e: React.PointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === "mouse") return;
+    const card = e.currentTarget;
+    clearTimeout(touchTimerRef.current);
+    touchTimerRef.current = setTimeout(() => {
+      delete card.dataset.touch;
+    }, TOUCH_LIGHT_MS);
   };
 
   return (
@@ -56,6 +91,7 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
       {/* min-h-dvh (not h-dvh + overflow-hidden) so the page scrolls when the
           content is taller than the screen: phones, in-app browsers, 200% zoom */}
       <main className="relative flex min-h-dvh w-full flex-col items-center px-4 font-sans sm:px-6">
+        <LiveAmbience />
         {/* Top bar in normal DOM order (share left, theme right). Below md it
             would sit over the column, so the content gets pt-20; from md up the
             buttons sit in the corners beside the centred max-w-lg column. The
@@ -73,14 +109,17 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
             {/* Entrances are CSS (tw-animate-css) so the server HTML paints
                 without waiting for JS; children stagger via their own delays */}
             <div
-              onMouseEnter={handleMouseEnter}
-              onMouseMove={handleMouseMove}
-              onMouseLeave={handleMouseLeave}
+              onPointerEnter={handlePointerEnter}
+              onPointerMove={handlePointerMove}
+              onPointerLeave={handlePointerLeave}
+              onPointerDown={handlePointerDown}
+              onPointerUp={handlePointerUp}
+              onPointerCancel={handlePointerUp}
               className="group/card relative flex w-full flex-col rounded-3xl border border-zinc-200/50 bg-white/40 shadow-2xl backdrop-blur-xl animate-in fade-in zoom-in-95 slide-in-from-bottom-8 fill-mode-backwards duration-700 dark:border-zinc-800/50 dark:bg-zinc-950/40"
             >
               {/* Named group: a bare `group` here would trigger the inner cards' group-hover styles */}
               <motion.div
-                className="pointer-events-none absolute -inset-px z-50 rounded-3xl border border-[#9146FF] opacity-0 transition-opacity duration-500 group-hover/card:opacity-100"
+                className="pointer-events-none absolute -inset-px z-50 rounded-3xl border border-[#9146FF] opacity-0 transition-opacity duration-500 group-hover/card:opacity-100 group-data-touch/card:opacity-100"
                 style={{
                   WebkitMaskImage: useMotionTemplate`radial-gradient(200px circle at ${mouseX}px ${mouseY}px, black 0%, transparent 100%)`,
                   maskImage: useMotionTemplate`radial-gradient(200px circle at ${mouseX}px ${mouseY}px, black 0%, transparent 100%)`,
@@ -131,7 +170,7 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
                         <Button
                           variant="ghost"
                           size="icon"
-                          className="h-10 w-10 rounded-xl border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50 dark:focus-visible:ring-offset-zinc-950 sm:h-12 sm:w-12"
+                          className="h-10 w-10 rounded-xl border border-transparent bg-transparent text-zinc-500 transition-all hover:scale-110 active:scale-95 hover:border-zinc-200/50 hover:bg-white/60 hover:text-zinc-900 hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:text-zinc-400 dark:hover:border-zinc-800/50 dark:hover:bg-zinc-900/60 dark:hover:text-zinc-50 dark:focus-visible:ring-offset-zinc-950 sm:h-12 sm:w-12"
                           asChild
                         >
                           <a
@@ -192,9 +231,10 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
           <span aria-hidden="true">•</span>
           <span>
             Made with{" "}
-            <span className="text-red-500 drop-shadow-[0_0_8px_rgba(239,68,68,0.5)]">
-              💜{" "}
-            </span>
+            {/* A colour class can't tint an emoji; the glow matches it */}
+            <span className="drop-shadow-[0_0_8px_rgba(145,70,255,0.6)]">
+              💜
+            </span>{" "}
             by {profileData.name}
           </span>
           <span aria-hidden="true">•</span>

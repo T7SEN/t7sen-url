@@ -84,11 +84,15 @@ src/
     ├── twitch-card, primary-link-card, support-card, profile-header,
     │   copy-email-button, share-profile-button, feedback-button,
     │   magnetic-wrapper, theme-toggle, icons, json-ld
+    ├── stream-status-provider  Polls /api/twitch once; useStreamStatus()
+    ├── live-ambience        Live mode outside the cards (glow, tab title, favicon)
     ├── motion-provider, posthog-provider, theme-provider
     └── ui/                  button, spotlight-background, spotlight-new
 public/                      avatar.webp, avatar.png (OG only), twitch-banner.webp,
-                             icon-192/512.png, icon-maskable-512.png (manifest)
-scripts/generate-icons.mjs   Renders icon.svg onto black tiles → the icon PNGs
+                             icon-192/512.png, icon-maskable-512.png (manifest),
+                             icon-live.svg (favicon while live)
+scripts/generate-icons.mjs   Renders icon.svg onto black tiles → the icon PNGs,
+                             and icon.svg + a red dot → icon-live.svg
 assets/fonts/                Space Grotesk Medium/Bold TTFs + OFL.txt (OG image only)
 sentry.server.config.ts, sentry.edge.config.ts
 ```
@@ -153,12 +157,17 @@ and served from the CDN with no function or proxy invocation per view. The
 only time-dependent value, the footer year, comes from `getCurrentYear()`
 (`'use cache'` + `cacheLife("days")`); under Cache Components a `Date` read
 must be cached or follow request data, and this makes the page revalidate
-daily. It renders `PageClient` with a `currentYear` prop.
+daily. It renders `PageClient` with a `currentYear` prop inside
+`StreamStatusProvider` (a client component: its polling starts in the
+browser, so the page stays static).
 
 ### 3. `src/app/page-client.tsx` — the visible page
 
-Client component. Composes `SpotlightBackground` → top bar (`ShareProfileButton`
-left, `ThemeToggle` right) → glass card (cursor-tracked purple border mask) →
+Client component. Composes `SpotlightBackground` → `LiveAmbience` → top bar
+(`ShareProfileButton` left, `ThemeToggle` right) → glass card (purple border
+mask that follows the cursor via pointer events; on touch screens it lights
+where a finger lands, via a `data-touch` attribute set on the DOM node so a
+touch never re-renders the page) →
 `ProfileHeader`, `TwitchCard`, primary links, socials (email uses
 `CopyEmailButton`), then `SupportCard` (copy from `profileData.support`) and
 footer. `main` is `min-h-dvh` and the page scrolls only when content is taller
@@ -196,8 +205,13 @@ falling back to production) used by metadata, JSON-LD, robots, sitemap, the
 OG domain line and the Share button. Display copy (bio, tagline, job title,
 knowsAbout, share text, OG subtitle) lives in `profile.ts`.
 
-**Twitch live status.** `TwitchCard` polls `/api/twitch?channel=…` via SWR
-(60 s interval, revalidate on focus throttled to 30 s). The fetcher throws on
+**Twitch live status.** `StreamStatusProvider`
+(`src/components/stream-status-provider.tsx`, wrapped around the page in
+`page.tsx`) polls `/api/twitch?channel=…` via SWR (60 s interval, revalidate
+on focus throttled to 30 s) once for the whole page; `TwitchCard`,
+`ProfileHeader` and `LiveAmbience` read `{ data, isLive, isUnknown }` from
+`useStreamStatus()`. Never add a second `useSWR` on that key: each hook runs
+its own refresh and retry timers. The fetcher throws on
 non-2xx, so a 429/500 never overwrites good data: the card shows the last
 known status, a skeleton before the first response, and a neutral "Status
 unknown" badge (not "Offline") when it has no data because the first
@@ -261,6 +275,21 @@ third-party image). Uptime and "next" come from `useMinuteClock()`
 (`src/lib/use-minute-clock.ts`: a `useSyncExternalStore` clock ticking each
 minute, null on the server and during hydration), because `Date.now()` in
 render breaks the purity lint rule and Cache Components prerendering.
+
+**Live mode.** While `isLive`, the page changes beyond the card, all
+client-side from the shared status (no extra request, `/` stays static):
+`ProfileHeader` swaps the avatar's static ring for a thicker spinning conic
+ring in the logo's colours with a red "LIVE" tag, and lays a link over the
+avatar (`/go/twitch`, `live_avatar_clicked`; an overlay, not a wrapping
+`<a>`, so the image never remounts); `LiveAmbience` fades in a breathing
+purple stage light (`-z-10` inside the content layer: above the background,
+below the cards), prefixes the tab title with "🔴 LIVE · " and points the SVG
+favicon at `public/icon-live.svg`, restoring both when the stream ends.
+Hidden tabs don't poll, so the tab shows the status from when the page was
+last visible. The ring and glow are the `animate-live-ring` /
+`animate-live-breathe` utilities from `globals.css`; reduced motion stops
+both. Rerun `node scripts/generate-icons.mjs` after changing `icon.svg` so
+`icon-live.svg` follows it.
 
 **OG image.** `/api/og` renders a 1200×630 `ImageResponse` with **fixed text
 only** (`profileData.name`, `profileData.ogSubtitle`, the Twitch tagline or
@@ -326,6 +355,7 @@ Event catalog:
 | `profile_shared` (with `method`: `native` \| `clipboard`, after the share succeeds) | `share-profile-button.tsx` |
 | `support_link_clicked` | `support-card.tsx` |
 | `twitch_card_clicked` (`is_live`: `true` | `false` | `null` when the status is unknown) | `twitch-card.tsx` |
+| `live_avatar_clicked` (`channel`; the avatar is a link only while live) | `profile-header.tsx` |
 | `theme_toggled` | `theme-toggle.tsx` |
 | `feedback_opened` (only when the Sentry form is attached, i.e. a DSN is set) | `feedback-button.tsx` |
 | `twitch_api_called` (server) | `api/twitch/route.ts` |
@@ -404,8 +434,9 @@ at `/api/*`: `robots.txt` disallows it and Sentry can disable the monitor.
 `/icon-maskable-512.png`), `src/app/apple-icon.png` (180×180, opaque) and
 `icon.svg` (favicon) are all prerendered. The PNGs come from
 `node scripts/generate-icons.mjs` (sharp renders `icon.svg` onto black
-tiles; the maskable one keeps the logo inside the 40% safe circle): rerun it
-after changing `icon.svg`. Static PNGs over `ImageResponse` icons
+tiles; the maskable one keeps the logo inside the 40% safe circle), which
+also writes `public/icon-live.svg` (the favicon plus a red dot, for live
+mode): rerun it after changing `icon.svg`. Static PNGs over `ImageResponse` icons
 (`icon.tsx`): Next 16.2 likely built those as uncached functions under Cache
 Components; 16.3 can prerender them, but the committed PNGs need no render
 at all and match `icon.svg` exactly.
@@ -418,7 +449,10 @@ per fetch.
 **Theming and visuals.** next-themes (`class` attribute, system default).
 `ThemeToggle` uses the View Transitions API for a circular clip-path reveal;
 the matching `::view-transition-*` rules live in `globals.css`. Visual
-language: zinc palette, Twitch purple `#9146FF` accent, glassmorphism
+language: zinc palette, Twitch purple `#9146FF` accent, with the logo's
+red `#ef4444` → purple → blue `#3b82f6` gradient (`icon.svg`) as the only
+secondary colours (the featured card's blobs, the live ring; no cyan; the
+background beams are tinted violet in `SpotlightBackground`), glassmorphism
 (`backdrop-blur-xl`, translucent white/zinc-950), Space Grotesk (the only
 font; `font-mono` falls back to Tailwind's default stack).
 
@@ -463,6 +497,17 @@ font; `font-mono` falls back to Tailwind's default stack).
 - **Every tracked click:** `if (posthog) posthog.capture(...)` via
   `usePostHog()`, plus `logger.info(...)` with `tags.component`.
 - **External links:** `target="_blank" rel="noopener noreferrer"`.
+- **Touch screens never hover.** Tailwind v4's `hover:` only applies under
+  `@media (hover: hover)`, and most visitors are on phones. Give every
+  tappable element an `active:` press state (`active:scale-95`, or
+  `active:scale-[0.98] active:duration-150` on cards so the press is quick
+  and the release keeps the slower base transition). Hover-only effects need
+  a touch counterpart: the glass card's border light uses pointer events and
+  `data-touch`; the featured card's reveal uses the `reveal:` variant
+  (`globals.css`: hover on hover-capable devices, or `data-reveal`, which
+  `PrimaryLinkCard` sets once when the card scrolls into view on a touch
+  screen, skipped under reduced motion). `reveal:` rules come after
+  `active:` in the CSS, so the featured card's press is `active:scale-[0.98]!`.
 - **Pointer tracking:** cache `getBoundingClientRect()` on `mouseenter` in
   **page coordinates** (`rect.left + scrollX`, `rect.top + scrollY`), read it
   on `mousemove` with `pageX`/`pageY`, clear on `mouseleave` — never measure
@@ -608,7 +653,8 @@ first-party cookie.
 `posthog` singleton (works, though `usePostHog()` is the pattern elsewhere);
 `PrimaryLinkCard` keeping `delay-500 duration-700` on its anchor, which also
 delays and slows its hover transition (left as is so the featured card's
-staged hover reveal keeps its timing).
+staged hover reveal keeps its timing; its press overrides them with
+`active:delay-0 active:duration-150`).
 
 **Housekeeping:** `eslint-config-next` is pinned to the exact `next`
 version; bump them together. ESLint 10 needs the `settings.react.version`
@@ -631,7 +677,10 @@ time. Local Node below 24 prints an `EBADENGINE` warning on install.
 - New data on the page → static or `'use cache'` if at all possible; per-request
   data only in an async component inside `<Suspense>` (costs a function per view).
 - New animation → CSS first; motion only via `m`, and only for interactive
-  effects.
+  effects. New hover effect → a touch counterpart; new tappable element → an
+  `active:` press state.
+- Need the live status in another component → `useStreamStatus()`, never a
+  second `useSWR` on `/api/twitch`.
 - New tracked interaction → PostHog event (add it to the event table here) +
   `logger.info`.
 - `npx tsc --noEmit`, `npm run lint` (0 problems), and `npm run build` all

@@ -11,6 +11,48 @@
    keep the full design and phones scroll. */
 @custom-variant short (@media (min-width: 48rem) and (max-height: 58.75rem));
 
+/* The featured card's reveal (PrimaryLinkCard, `group/featured`): on hover
+   where the device can hover, and while the card carries data-reveal, which
+   it sets once on touch screens (hover never applies there) when it scrolls
+   into view. Matches the card itself and its children, with group-hover's
+   specificity. */
+@custom-variant reveal {
+  &:is(
+    :where(.group\/featured)[data-reveal],
+    :where(.group\/featured)[data-reveal] *
+  ) {
+    @slot;
+  }
+  @media (hover: hover) {
+    &:is(:where(.group\/featured):hover, :where(.group\/featured):hover *) {
+      @slot;
+    }
+  }
+}
+
+@theme {
+  /* Live mode (stream is live): the avatar's spinning ring and the page's
+     breathing glow. The prefers-reduced-motion block below stops both. */
+  --animate-live-ring: live-ring 4s linear infinite;
+  --animate-live-breathe: live-breathe 6s ease-in-out infinite;
+
+  @keyframes live-ring {
+    to {
+      transform: rotate(1turn);
+    }
+  }
+
+  @keyframes live-breathe {
+    0%,
+    100% {
+      opacity: 0.55;
+    }
+    50% {
+      opacity: 1;
+    }
+  }
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

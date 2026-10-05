@@ -85,7 +85,7 @@ export function CopyEmailButton({ id, emailUrl, title }: CopyEmailButtonProps) {
         onClick={handleCopy}
         // 🚀 Button width is strictly locked to w-10/w-12 to prevent any layout shifts
         className={cn(
-          "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition-all sm:h-12 sm:w-12",
+          "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition-all active:scale-95 sm:h-12 sm:w-12",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           copied
             ? // Success State (Green Border/Icon)

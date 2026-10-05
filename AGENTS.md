@@ -50,6 +50,9 @@ before declaring a change done.
   `health`. `src/app/manifest.ts` + `apple-icon.png` — web app manifest
   and iOS icon (PNGs from `scripts/generate-icons.mjs`).
 - `src/components/` — feature components; `ui/` for primitives.
+  `stream-status-provider.tsx` polls `/api/twitch` once for the page: read
+  the live status with `useStreamStatus()` (the card, the avatar ring and
+  `live-ambience.tsx` do), never a second `useSWR` on that key.
 - `src/lib/logger.ts` — Sentry-backed logger; `src/lib/twitch.ts` — Helix
   live status (shared by `/api/twitch` and `/api/og`) and schedule;
   `src/lib/use-minute-clock.ts` — the time for client components.
@@ -97,6 +100,9 @@ tracked click fires a PostHog event (`usePostHog()`, guarded) plus
 `logger.info` with `tags.component`. External links use
 `target="_blank" rel="noopener noreferrer"`. `src/` files start with a
 `// src/path` header comment. Tailwind v4 class names (`bg-linear-to-r`).
+Touch screens never hover (`hover:` is `@media (hover: hover)` in Tailwind
+v4): give tappable elements an `active:` press state and hover effects a
+touch counterpart (see SKILL.md Conventions).
 `npm run lint` enforces the header, the motion import, no
 `useCallback`/`useMemo`, error-first `logger.error`, Tailwind v4 gradient
 names, no hardcoded URL `href`s and `rel="noopener noreferrer"` on every

@@ -1,9 +1,11 @@
 // scripts/generate-icons.mjs
 // Renders the T7 favicon (src/app/icon.svg) onto opaque black tiles for the
-// apple-touch-icon and the web manifest (src/app/manifest.ts). The PNGs are
-// committed, so serving them costs no function; rerun this after changing
-// icon.svg:  node scripts/generate-icons.mjs
-import { readFile } from "node:fs/promises";
+// apple-touch-icon and the web manifest (src/app/manifest.ts), and writes
+// public/icon-live.svg (the favicon plus a red dot; LiveAmbience swaps it in
+// while the stream is live). The files are committed, so serving them costs
+// no function; rerun this after changing icon.svg:
+//   node scripts/generate-icons.mjs
+import { readFile, writeFile } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
 
@@ -38,3 +40,16 @@ for (const { file, size, art } of outputs) {
 
   console.log(`${file} ${size}x${size}`);
 }
+
+// The dot sits in the logo's empty bottom-right corner (viewBox
+// -20 -20 504.22 482.36), about 7px across at 16px
+const liveFile = "public/icon-live.svg";
+const liveSvg = svg
+  .toString()
+  .replace(
+    "</svg>",
+    '  <circle cx="374" cy="352" r="110" fill="#ef4444"/>\n</svg>',
+  );
+if (liveSvg === svg.toString()) throw new Error("icon.svg has no </svg>");
+await writeFile(fileURLToPath(new URL(liveFile, root)), liveSvg);
+console.log(liveFile);

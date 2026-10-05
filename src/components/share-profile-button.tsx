@@ -96,7 +96,7 @@ export function ShareProfileButton() {
       <button
         onClick={handleShare}
         className={cn(
-          "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition-all sm:h-12 sm:w-12",
+          "group relative flex h-10 w-10 cursor-pointer items-center justify-center rounded-xl border transition-all active:scale-95 sm:h-12 sm:w-12",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           copied
             ? "scale-110 border-emerald-500/20 bg-emerald-500/10 text-emerald-600 shadow-inner dark:bg-emerald-500/20 dark:text-emerald-400"

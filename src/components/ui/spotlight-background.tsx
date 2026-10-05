@@ -70,8 +70,13 @@ export function SpotlightBackground({
         }}
       />
 
-      {/* The Ambient Spotlight Beams */}
-      <Spotlight />
+      {/* The Ambient Spotlight Beams, tinted to the brand violet (the
+          component's default is a pale blue) */}
+      <Spotlight
+        gradientFirst="radial-gradient(68.54% 68.72% at 55.02% 31.46%, hsla(265, 100%, 85%, .08) 0, hsla(265, 100%, 60%, .02) 50%, hsla(265, 100%, 50%, 0) 80%)"
+        gradientSecond="radial-gradient(50% 50% at 50% 50%, hsla(265, 100%, 85%, .06) 0, hsla(265, 100%, 60%, .02) 80%, transparent 100%)"
+        gradientThird="radial-gradient(50% 50% at 50% 50%, hsla(265, 100%, 85%, .04) 0, hsla(265, 100%, 50%, .02) 80%, transparent 100%)"
+      />
 
       {/* Content layer */}
       <div className="relative z-10 flex flex-1 flex-col">{children}</div>

@@ -13,21 +13,13 @@ import { Icons } from "@/components/icons";
 import { profileData } from "@/config/profile";
 import { usePostHog } from "posthog-js/react";
 import { cn } from "@/lib/utils";
-import useSWR from "swr";
 import { logger } from "@/lib/logger";
 import { useMinuteClock } from "@/lib/use-minute-clock";
 import type { StreamSchedule } from "@/lib/twitch";
-
-// Fields beyond isLive are optional: the route's timeout fallback sends only
-// { isLive: false }
-type TwitchStatus = {
-  isLive: boolean;
-  game?: string | null;
-  title?: string | null;
-  startedAt?: string | null;
-  schedule?: StreamSchedule | null;
-};
-type TwitchFetchError = Error & { status?: number };
+import {
+  useStreamStatus,
+  type TwitchStatus,
+} from "@/components/stream-status-provider";
 
 type BannerChip = { key: string; strong?: boolean; content: React.ReactNode };
 
@@ -156,17 +148,6 @@ function scheduleChips(schedule: StreamSchedule, now: number): BannerChip[] {
   return chips;
 }
 
-// Throw on non-2xx so a 429/500 body never replaces the last known status
-const fetcher = async (url: string): Promise<TwitchStatus> => {
-  const res = await fetch(url);
-  if (!res.ok) {
-    throw Object.assign(new Error(`/api/twitch responded ${res.status}`), {
-      status: res.status,
-    });
-  }
-  return res.json();
-};
-
 export function TwitchCard() {
   const posthog = usePostHog();
   const channel = profileData.twitchChannel;
@@ -196,57 +177,9 @@ export function TwitchCard() {
     boundsRef.current = null;
   };
 
-  // While the page is visible and online, SWR calls onErrorRetry after every
-  // failed request it starts, focus revalidations included, so a timer per
-  // call stacked parallel 60 s retry loops during an outage. Keep exactly one
-  // pending retry.
-  const retryTimerRef = React.useRef<ReturnType<typeof setTimeout>>(undefined);
-
-  React.useEffect(() => () => clearTimeout(retryTimerRef.current), []);
-
-  const { data, error } = useSWR<TwitchStatus, TwitchFetchError>(
-    `/api/twitch?channel=${channel}`,
-    fetcher,
-    {
-      refreshInterval: 60000,
-      revalidateOnFocus: true,
-      // Focus revalidation at most every 30 s, however often the tab switches
-      focusThrottleInterval: 30000,
-      // SWR pauses refreshInterval while an error is cached, so retry on the
-      // same 60 s cadence as refreshInterval to keep polling
-      onErrorRetry: (_err, _key, _config, revalidate, opts) => {
-        clearTimeout(retryTimerRef.current);
-        retryTimerRef.current = setTimeout(() => revalidate(opts), 60000);
-      },
-      onSuccess: () => clearTimeout(retryTimerRef.current),
-    },
-  );
-
-  React.useEffect(() => {
-    if (!error) return;
-    // An HTTP status means the server answered: 5xx is already reported
-    // server-side and a 429 is the Vercel Firewall rate limit (see SKILL.md),
-    // so don't raise a second exception
-    if (error.status) {
-      logger.warn("Twitch status request failed", {
-        tags: {
-          component: "TwitchCard",
-          issue: "swr_http_error",
-          status: String(error.status),
-        },
-      });
-      return;
-    }
-    logger.error(error, {
-      tags: { component: "TwitchCard", issue: "swr_fetch_failed" },
-    });
-  }, [error]);
-
-  // SWR keeps the last good data on a failed revalidation: show it rather than
-  // flipping a live stream to Offline. With no data at all (the first request
-  // failed: a 5xx, no network) the status is unknown, not offline.
-  const isLive: boolean | null = data === undefined ? null : data.isLive === true;
-  const isUnknown = data === undefined && error !== undefined;
+  // Polled once for the page (StreamStatusProvider): last good data through
+  // failed revalidations, null before the first response
+  const { data, isLive, isUnknown } = useStreamStatus();
 
   // Banner overlay: fixed-height banner, so it never changes the card's size
   const now = useMinuteClock();
@@ -279,9 +212,11 @@ export function TwitchCard() {
   };
 
   // The channel name and tagline are static (profile.ts), so the skeleton
-  // renders the same text block as the loaded card: on phones the tagline
-  // wraps to 2-3 lines, and fixed-height placeholder bars made the card grow
+  // renders the same text block as the loaded card: on narrow phones the
+  // tagline still wraps, and fixed-height placeholder bars made the card grow
   // by up to 52px when the status arrived. Only the status parts pulse.
+  // Below sm the padding, icon tile and arrow shrink so the tagline gets
+  // ~160px at 375px wide (2 lines instead of 4); keep both layouts in sync.
   const channelText = (
     <div className="text-left">
       <h2 className="text-xl font-black tracking-tight text-zinc-900 transition-colors duration-300 group-hover:text-zinc-700 dark:text-zinc-50 dark:group-hover:text-white">
@@ -309,14 +244,14 @@ export function TwitchCard() {
               fetchPriority="high"
             />
           </div>
-          <div className="relative -mt-5 flex flex-col items-center px-6 pb-6 text-center short:pb-4">
+          <div className="relative -mt-5 flex flex-col items-center px-4 pb-6 text-center sm:px-6 short:pb-4">
             <div className="mb-5 h-7 w-24 animate-pulse rounded-full bg-zinc-300 short:mb-3 dark:bg-zinc-800" />
-            <div className="flex w-full items-center justify-between gap-4">
-              <div className="flex items-center gap-4">
-                <div className="h-14 w-14 shrink-0 animate-pulse rounded-2xl bg-zinc-300 dark:bg-zinc-800" />
+            <div className="flex w-full items-center justify-between gap-3 sm:gap-4">
+              <div className="flex items-center gap-3 sm:gap-4">
+                <div className="h-12 w-12 shrink-0 animate-pulse rounded-2xl bg-zinc-300 sm:h-14 sm:w-14 dark:bg-zinc-800" />
                 {channelText}
               </div>
-              <div className="h-10 w-10 shrink-0 animate-pulse rounded-full bg-zinc-300 dark:bg-zinc-800" />
+              <div className="h-8 w-8 shrink-0 animate-pulse rounded-full bg-zinc-300 sm:h-10 sm:w-10 dark:bg-zinc-800" />
             </div>
           </div>
         </div>
@@ -339,7 +274,9 @@ export function TwitchCard() {
         onMouseLeave={handleMouseLeave}
         onClick={handleClick}
         className={cn(
-          "group relative block w-full overflow-hidden rounded-3xl border transition-all duration-500 hover:scale-[1.02]",
+          // active: a quick press on touch screens (hover never applies there),
+          // released at the slower base duration
+          "group relative block w-full overflow-hidden rounded-3xl border transition-all duration-500 hover:scale-[1.02] active:scale-[0.98] active:duration-150",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           isLive
             ? "border-[#9146FF]/40 bg-white/60 shadow-[0_0_40px_-10px_rgba(145,70,255,0.2)] hover:border-[#9146FF] hover:shadow-[0_0_60px_-10px_rgba(145,70,255,0.4)] dark:bg-[#030303] dark:shadow-[0_0_40px_-10px_rgba(145,70,255,0.3)] dark:hover:shadow-[0_0_60px_-10px_rgba(145,70,255,0.5)]"
@@ -392,7 +329,7 @@ export function TwitchCard() {
           style={{ background: glareBackground }}
         />
 
-        <div className="relative z-20 -mt-5 flex flex-col items-center px-6 pb-6 text-center short:pb-4">
+        <div className="relative z-20 -mt-5 flex flex-col items-center px-4 pb-6 text-center sm:px-6 short:pb-4">
           <div className="mb-5 h-7 short:mb-3">
             <AnimatePresence mode="wait">
               {isLive ? (
@@ -425,17 +362,17 @@ export function TwitchCard() {
             </AnimatePresence>
           </div>
 
-          <div className="flex w-full items-center justify-between gap-4">
-            <div className="flex items-center gap-4">
+          <div className="flex w-full items-center justify-between gap-3 sm:gap-4">
+            <div className="flex items-center gap-3 sm:gap-4">
               <div
                 className={cn(
-                  "relative flex h-14 w-14 shrink-0 animate-in fade-in items-center justify-center rounded-2xl border backdrop-blur-md transition-all duration-500 group-hover:scale-110",
+                  "relative flex h-12 w-12 shrink-0 animate-in fade-in items-center justify-center rounded-2xl border backdrop-blur-md transition-all duration-500 group-hover:scale-110 sm:h-14 sm:w-14",
                   isLive
                     ? "border-[#9146FF]/30 bg-white/80 text-[#9146FF] shadow-[0_0_20px_rgba(145,70,255,0.2)] group-hover:bg-[#9146FF] group-hover:text-white dark:border-[#9146FF]/50 dark:bg-[#9146FF]/20 dark:shadow-[0_0_20px_rgba(145,70,255,0.4)]"
                     : "border-zinc-200 bg-white text-zinc-500 shadow-sm group-hover:border-zinc-300 group-hover:bg-zinc-50 group-hover:text-zinc-700 dark:border-zinc-700/50 dark:bg-zinc-800/50 dark:text-zinc-400 dark:shadow-none dark:group-hover:border-zinc-600 dark:group-hover:bg-zinc-700 dark:group-hover:text-zinc-200",
                 )}
               >
-                <Icons.twitch className="relative z-10 h-7 w-7 transition-transform duration-500 group-hover:-rotate-12" />
+                <Icons.twitch className="relative z-10 h-6 w-6 transition-transform duration-500 group-hover:-rotate-12 sm:h-7 sm:w-7" />
               </div>
 
               {channelText}
@@ -443,7 +380,7 @@ export function TwitchCard() {
 
             <div
               className={cn(
-                "flex h-10 w-10 shrink-0 animate-in fade-in items-center justify-center rounded-full border backdrop-blur-md transition-all duration-300 group-hover:-rotate-45",
+                "flex h-8 w-8 shrink-0 animate-in fade-in items-center justify-center rounded-full border backdrop-blur-md transition-all duration-300 group-hover:-rotate-45 sm:h-10 sm:w-10",
                 isLive
                   ? "border-[#9146FF]/20 bg-white/50 text-[#9146FF] group-hover:border-[#9146FF]/40 group-hover:bg-[#9146FF]/10 dark:border-[#9146FF]/30 dark:bg-[#9146FF]/10 dark:group-hover:border-[#9146FF]/50 dark:group-hover:bg-[#9146FF]/20"
                   : "border-zinc-200 bg-zinc-50 text-zinc-400 group-hover:border-zinc-300 group-hover:bg-zinc-100 group-hover:text-zinc-600 dark:border-zinc-800 dark:bg-zinc-800/50 dark:text-zinc-500 dark:group-hover:border-zinc-600 dark:group-hover:bg-zinc-700 dark:group-hover:text-zinc-300",
@@ -455,7 +392,7 @@ export function TwitchCard() {
                 viewBox="0 0 15 15"
                 fill="none"
                 xmlns="http://www.w3.org/2000/svg"
-                className="h-5 w-5"
+                className="h-4 w-4 sm:h-5 sm:w-5"
               >
                 <path
                   d="M6.1584 3.13508C6.35985 2.95662 6.66436 2.97484 6.84283 3.1763L10.3428 7.1763C10.5053 7.36195 10.5053 7.63805 10.3428 7.8237L6.84283 11.8237C6.66436 12.0252 6.35985 12.0434 6.1584 11.8649C5.95694 11.6865 5.93872 11.382 6.11718 11.1805L9.27878 7.5L6.11718 3.81949C5.93872 3.61803 5.95694 3.31353 6.1584 3.13508Z"

@@ -1,5 +1,6 @@
 // src/app/page.tsx
 import { cacheLife } from "next/cache";
+import { StreamStatusProvider } from "@/components/stream-status-provider";
 import PageClient from "./page-client";
 
 // The page reads no request data, so it is prerendered and served from the
@@ -14,5 +15,11 @@ async function getCurrentYear() {
 export default async function Home() {
   const currentYear = await getCurrentYear();
 
-  return <PageClient currentYear={currentYear} />;
+  // The provider polls the Twitch status in the browser (one request for the
+  // card, the avatar ring and the live ambience); nothing here reads it
+  return (
+    <StreamStatusProvider>
+      <PageClient currentYear={currentYear} />
+    </StreamStatusProvider>
+  );
 }
