@@ -82,7 +82,7 @@ export function SpotlightBackground({
           the cursor (as before) repainted a full-viewport layer, grain
           included, on every frame. Promoted only where a mouse can move it. */}
       <motion.div
-        className="pointer-events-none fixed top-0 left-0 z-0 size-[1200px] bg-[radial-gradient(closest-side,rgba(145,70,255,0.07),transparent_80%)] pointer-fine:will-change-transform"
+        className="pointer-events-none fixed top-0 left-0 z-0 size-300 bg-[radial-gradient(closest-side,rgba(145,70,255,0.07),transparent_80%)] pointer-fine:will-change-transform"
         style={{ x: glowX, y: glowY }}
       />
 
