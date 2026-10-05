@@ -91,8 +91,12 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           "bg-white/80 border border-zinc-200/50",
           "dark:bg-[#030303] dark:border-transparent",
-          "reveal:bg-[#030303] reveal:border-transparent reveal:shadow-[0_0_50px_-15px_rgba(145,70,255,0.5)]",
-          "dark:reveal:bg-[#030303] dark:reveal:border-transparent dark:reveal:shadow-[0_0_50px_-15px_rgba(145,70,255,0.5)]",
+          // The background never changes on reveal: the purple burst covers
+          // it. A light-mode reveal:bg-[#030303] used to run on the entrance
+          // classes' delay-500 duration-700, so on mouse-out the burst faded
+          // first and left the card black for ~1 s before it turned white.
+          "reveal:border-transparent reveal:shadow-[0_0_50px_-15px_rgba(145,70,255,0.5)]",
+          "dark:reveal:border-transparent dark:reveal:shadow-[0_0_50px_-15px_rgba(145,70,255,0.5)]",
         )}
       >
         <div

@@ -707,7 +707,11 @@ first-party cookie.
 `PrimaryLinkCard` keeping `delay-500 duration-700` on its anchor, which also
 delays and slows its hover transition (left as is so the featured card's
 staged hover reveal keeps its timing; its press overrides them with
-`active:delay-0 active:duration-150`).
+`active:delay-0 active:duration-150`). Because of that delay, never change
+the anchor's background on `reveal:`: a light-mode `reveal:bg-[#030303]`
+left the card black for ~1 s after mouse-out (the purple burst faded first,
+then the background crawled back to white); the burst alone colours the
+reveal, so light mode reads a lighter violet than dark mode.
 
 **Housekeeping:** `eslint-config-next` is pinned to the exact `next`
 version; bump them together. ESLint 10 needs the `settings.react.version`
