@@ -10,7 +10,7 @@ const loadFeatures = () =>
 export function MotionProvider({ children }: { children: React.ReactNode }) {
   return (
     // reducedMotion="user": honour the OS "reduce motion" setting by skipping
-    // transform animations (looping beams, the featured-card bob, badge scales).
+    // transform animations (the featured-card bob, badge scales).
     // Pointer-driven springs (MagneticWrapper, SpotlightBackground) check
     // useReducedMotion themselves.
     <MotionConfig reducedMotion="user">

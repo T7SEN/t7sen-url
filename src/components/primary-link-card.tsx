@@ -138,7 +138,12 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
               {title}
             </span>
 
-            <span className="col-start-1 row-start-1 z-10 bg-linear-to-b from-white to-purple-100 bg-clip-text text-2xl font-black tracking-[0.15em] text-transparent opacity-0 transition-opacity duration-700 reveal:opacity-100 reveal:delay-[400ms]">
+            {/* Decorative copy for the reveal: only opacity-0 at rest, so it
+                would add the title to the link's name a second time */}
+            <span
+              aria-hidden="true"
+              className="col-start-1 row-start-1 z-10 bg-linear-to-b from-white to-purple-100 bg-clip-text text-2xl font-black tracking-[0.15em] text-transparent opacity-0 transition-opacity duration-700 reveal:opacity-100 reveal:delay-[400ms]"
+            >
               {title}
             </span>
           </div>

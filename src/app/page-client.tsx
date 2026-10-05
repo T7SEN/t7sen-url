@@ -226,7 +226,9 @@ export default function PageClient({ currentYear }: { currentYear: number }) {
         </div>
 
         {/* In normal flow at the bottom; it used to be absolute and overlap the support card */}
-        <footer className="flex items-center gap-1 py-4 text-xs font-medium text-zinc-500 animate-in fade-in fill-mode-backwards delay-1000 duration-700 short:py-3 dark:text-zinc-400">
+        {/* zinc-600, not 500: the light aurora's red field and the live glow
+            drift under the footer and took 12px zinc-500 text below 4.5:1 */}
+        <footer className="flex items-center gap-1 py-4 text-xs font-medium text-zinc-600 animate-in fade-in fill-mode-backwards delay-1000 duration-700 short:py-3 dark:text-zinc-400">
           <span>© {currentYear}</span>
           <span aria-hidden="true">•</span>
           <span>

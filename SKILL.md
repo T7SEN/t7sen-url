@@ -37,8 +37,9 @@ analytics/telemetry channels run alongside. Small surface, tight coupling.
   `npx shadcn add <component>` installs `@base-ui/react` again (fine when a
   component needs it). The only shadcn primitive in use, `ui/button.tsx`, uses
   `radix-ui`'s `Slot`; `globals.css` imports `shadcn/tailwind.css`. Registries
-  in `components.json`: Aceternity (`spotlight-new.tsx` came from it) and
-  React Bits.
+  in `components.json`: Aceternity and React Bits (nothing from either is in
+  use now; the Aceternity `spotlight-new.tsx` beams gave way to the CSS
+  aurora).
 - **motion 14** (`motion/react`) under `LazyMotion strict` + `tw-animate-css`.
 - **SWR 2.5** (Twitch polling only), **next-themes 0.4.6**, **lucide-react**.
 - **Sentry 11.4** (`@sentry/nextjs`), **PostHog** (`posthog-js` 1.435,
@@ -87,7 +88,7 @@ src/
     ├── stream-status-provider  Polls /api/twitch once; useStreamStatus()
     ├── live-ambience        Live mode outside the cards (glow, tab title, favicon)
     ├── motion-provider, posthog-provider, theme-provider
-    └── ui/                  button, spotlight-background, spotlight-new
+    └── ui/                  button, spotlight-background (CSS aurora + cursor glow)
 public/                      avatar.webp, avatar.png (OG only), twitch-banner.webp,
                              icon-192/512.png, icon-maskable-512.png (manifest),
                              icon-live.svg (favicon while live)
@@ -180,13 +181,29 @@ so `md:pt-8`. The bar is `pointer-events-none` with `*:pointer-events-auto`
 so its empty middle never blocks hover on the card beneath it on short
 screens. Wide-but-short screens use the `short:` variant (defined in
 `globals.css`: ≥768px wide, ≤940px tall) to tighten spacing, the avatar and
-the Twitch banner: content is ~899px at full size and ~727px compact, so wide
+the Twitch banner: content is ~919px at full size (22px to spare at 941px
+tall, where the full layout starts) and ~727px compact, so wide
 windows ≥727px tall fit without a scrollbar (a 1366×768 laptop's ~650px
 viewport still scrolls ~77px); phones scroll. `<body>` is `min-h-dvh`, not
 `min-h-screen` (100vh is the toolbar-hidden height on mobile and forces a
 phantom scroll). Entrances are CSS (`tw-animate-css`) staggered by
 per-element delays, so the server HTML paints without waiting for JS; the
 support card's entrance sits on its shadowed wrapper in `page-client.tsx`.
+
+`ProfileHeader`: the avatar is 112px and the name `md:text-4xl` from `md` up
+outside the `short:` band (which also starts at `md`); narrower screens keep
+96px / `sm:text-3xl` and short laptops 80px / `text-2xl`, so no viewport that
+fit before scrolls. On a fresh load the name "decodes": random glyphs lock in
+left to right (5 × 130 ms), starting when its fade-in starts (the effect reads
+the entrance animation's `currentTime` and waits out the rest of its 300 ms
+delay), and hovering the name itself with a mouse replays it. The scramble is
+an overlay over the real name, which stays in the DOM and turns transparent
+meanwhile: `aria-hidden` (screen readers), `pointer-events-none select-none`
+(selection and copy) and anchored at the text's left edge in a shrink-wrapped
+`inline-block`, so locked letters don't move. The server HTML has no overlay.
+It is skipped under reduced motion and when it could not start before 1.2 s
+(slow hydration: the name was already readable, so scrambling it then would
+look like a glitch).
 
 ## Subsystems
 
@@ -447,14 +464,48 @@ file-based icon links) or `themeColor` in `metadata` (ignored in Next 16).
 per fetch.
 
 **Theming and visuals.** next-themes (`class` attribute, system default).
-`ThemeToggle` uses the View Transitions API for a circular clip-path reveal;
-the matching `::view-transition-*` rules live in `globals.css`. Visual
+`ThemeToggle` (a plain button with the share button's box, hover, press and
+`cursor-pointer`; Tailwind v4 buttons default to `cursor: default`) reveals
+the new theme with a circular View Transition centred on the click point
+(the button's centre for keyboard presses). It sets `data-theme-switch="to-dark|to-light"`
+and `--theme-x/-y/-r` on `<html>`; the animation is CSS in `globals.css`. The
+outgoing page is always the top, animated layer: to dark, a hole
+(`mask-image` + the registered `--theme-hole` length) grows in the light
+snapshot; to light, the dark snapshot's `clip-path` circle shrinks into the
+button. Don't animate the incoming page over a still snapshot of the old one:
+in the owner's browser the still old layer wasn't drawn and light-to-dark
+flashed the `zinc-950` canvas (headless Chrome and Edge didn't reproduce it).
+The update callback applies the class and `color-scheme` itself, with
+transitions off and a forced layout (`applyTheme`), then calls `setTheme`:
+`setTheme` alone switches the class only after React re-renders, after the
+transition has captured the "new" page, and next-themes'
+`disableTransitionOnChange` never forces that restyle, so revealed elements
+used to fade from their old colours. Direction comes from the `<html>` class
+plus a pending theme (keyboard presses reach the button mid-transition;
+clicks don't, the transition overlay takes them). Reduced motion skips the
+reveal but switches the same way. Visual
 language: zinc palette, Twitch purple `#9146FF` accent, with the logo's
 red `#ef4444` → purple → blue `#3b82f6` gradient (`icon.svg`) as the only
-secondary colours (the featured card's blobs, the live ring; no cyan; the
-background beams are tinted violet in `SpotlightBackground`), glassmorphism
-(`backdrop-blur-xl`, translucent white/zinc-950), Space Grotesk (the only
-font; `font-mono` falls back to Tailwind's default stack).
+secondary colours (the featured card's blobs, the live ring, the aurora; no
+cyan), glassmorphism (`backdrop-blur-xl`, translucent white/zinc-950), Space
+Grotesk (the only font; `font-mono` falls back to Tailwind's default stack).
+
+**Aurora.** `SpotlightBackground` (every page: home, error, not-found) lays
+three large soft colour fields (purple top-left, blue top-right, red at the
+bottom; alpha 0.08–0.24, stronger in dark mode) under the cursor glow. Each
+drifts on its own 26/32/38 s `alternate` loop (`animate-aurora-1..3` in
+`globals.css`), so the page moves on phones too. Cheap by construction: the
+gradients fade to transparent (no `filter: blur`) and only `transform`
+animates, so the compositor runs them without repaints
+(`motion-safe:will-change-transform`: under reduced motion the drift stops
+and the big layers are dropped); a static `bg-grain` noise layer (3.5% light,
+5% dark, a `@utility` in `globals.css`) hides gradient banding. The cursor
+glow above it is a fixed 1200px circle moved by `transform` (motion `x`/`y`),
+not a gradient repainted at the cursor, which re-rastered the full-viewport
+grain layer on every mouse frame; it is promoted only under `pointer-fine:`.
+Text sitting directly on the background (the footer) is `text-zinc-600` in
+light mode: the red field and the live glow drift under it and took
+`zinc-500` below 4.5:1.
 
 ## Conventions
 
@@ -639,8 +690,10 @@ bring it back legitimately, see Stack), the `.scroll-reveal` utility,
 nothing), `autoprefixer`, `@tailwindcss/cli`, `mini-svg-data-uri`,
 `experimental.optimizeCss` + `critters` (Next 16 only runs them for Pages
 Router pages), the Sentry `webpack` build options (ignored under Turbopack),
-the root `instrumentation-client.ts` and `posthog-setup-report.md`. `sharp`
-stays: `scripts/generate-icons.mjs` uses it.
+the root `instrumentation-client.ts` and `posthog-setup-report.md`, and
+`ui/spotlight-new.tsx` (Aceternity's motion-driven beams, nearly invisible;
+the CSS aurora replaced them). `sharp` stays: `scripts/generate-icons.mjs`
+uses it.
 
 **Cost and privacy choices to flag before changing:** `tracesSampleRate: 1`
 in all three Sentry runtimes (server traces are now really delivered, see

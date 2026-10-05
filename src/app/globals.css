@@ -5,7 +5,7 @@
 @custom-variant dark (&:is(.dark *));
 
 /* Wide but short viewports (most laptops): `short:` tightens the vertical
-   rhythm. At full size the content is ~899px tall; compact it is ~727px, so
+   rhythm. At full size the content is ~919px tall; compact it is ~727px, so
    windows 727-940px tall fit without a scrollbar and shorter ones (e.g. a
    1366x768 laptop's ~650px viewport) still scroll a little. Taller screens
    keep the full design and phones scroll. */
@@ -51,6 +51,57 @@
       opacity: 1;
     }
   }
+
+  /* The aurora behind every page (SpotlightBackground): three colour fields
+     drifting on their own slow loops. transform only, so the compositor runs
+     them without repainting; the reduced-motion block below stops them. */
+  --animate-aurora-1: aurora-1 26s ease-in-out infinite alternate;
+  --animate-aurora-2: aurora-2 32s ease-in-out infinite alternate;
+  --animate-aurora-3: aurora-3 38s ease-in-out infinite alternate;
+
+  @keyframes aurora-1 {
+    0% {
+      transform: translate(0, 0) scale(1);
+    }
+    50% {
+      transform: translate(14vmax, 8vmax) scale(1.15);
+    }
+    100% {
+      transform: translate(6vmax, 18vmax) scale(0.95);
+    }
+  }
+
+  @keyframes aurora-2 {
+    0% {
+      transform: translate(0, 0) scale(1.05);
+    }
+    50% {
+      transform: translate(-12vmax, 12vmax) scale(0.9);
+    }
+    100% {
+      transform: translate(-20vmax, 2vmax) scale(1.15);
+    }
+  }
+
+  @keyframes aurora-3 {
+    0% {
+      transform: translate(0, 0) scale(0.95);
+    }
+    50% {
+      transform: translate(10vmax, -10vmax) scale(1.2);
+    }
+    100% {
+      transform: translate(-8vmax, -16vmax) scale(1);
+    }
+  }
+}
+
+/* Fine static grain over the aurora: breaks up the banding that soft
+   gradients show on 8-bit screens. Fractal noise (baseFrequency 0.8) like
+   the featured card's, one octave fewer (the fourth is sub-pixel). */
+@utility bg-grain {
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+  background-size: 200px 200px;
 }
 
 @theme inline {
@@ -177,28 +228,66 @@
   }
 }
 
+/* The theme toggle's circular reveal (ThemeToggle sets data-theme-switch and
+   the --theme-x / --theme-y / --theme-r origin and radius on <html>; the
+   View Transition pseudo-elements inherit them). The outgoing page is always
+   the top, animated layer and the incoming one (live) sits still beneath:
+   with the incoming dark page animated on top and the light snapshot still
+   underneath, some browsers drew nothing there and flashed the zinc-950
+   canvas. Both reveals are centred on the toggle:
+   - to dark: a hole grows in the light page, showing the dark page;
+   - to light: the dark page shrinks into the toggle.
+   CSS animations (not WAAPI after `ready`), so no frame shows them unset. */
+@property --theme-hole {
+  syntax: "<length>";
+  inherits: false;
+  initial-value: 0px;
+}
+
 @layer base {
-  /* 🚀 Disable the default browser cross-fade for the root transition 
-		so our JS-driven clip-path animation runs cleanly.
-	*/
+  /* No default cross-fade */
   ::view-transition-old(root),
   ::view-transition-new(root) {
     animation: none;
     mix-blend-mode: normal;
   }
 
-  /* Ensure the dark mode snapshot always sits on top during the animation */
-  .dark::view-transition-old(root) {
-    z-index: 1;
-  }
-  .dark::view-transition-new(root) {
-    z-index: 999;
-  }
   ::view-transition-old(root) {
-    z-index: 999;
+    z-index: 2;
   }
   ::view-transition-new(root) {
     z-index: 1;
+  }
+
+  [data-theme-switch="to-dark"]::view-transition-old(root) {
+    mask-image: radial-gradient(
+      circle at var(--theme-x) var(--theme-y),
+      transparent var(--theme-hole),
+      #000 calc(var(--theme-hole) + 0.5px)
+    );
+    animation: theme-hole-grow 500ms ease-in-out both;
+  }
+
+  [data-theme-switch="to-light"]::view-transition-old(root) {
+    animation: theme-shrink 500ms ease-in-out both;
+  }
+}
+
+@keyframes theme-hole-grow {
+  from {
+    --theme-hole: 0px;
+  }
+  to {
+    --theme-hole: var(--theme-r);
+  }
+}
+
+@keyframes theme-shrink {
+  from {
+    clip-path: circle(var(--theme-r) at var(--theme-x) var(--theme-y));
+  }
+  to {
+    clip-path: circle(0px at var(--theme-x) var(--theme-y));
   }
 }
 
