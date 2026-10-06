@@ -108,6 +108,13 @@ const nextConfig: NextConfig = {
         source: "/ingest/static/:path*",
         destination: "https://eu-assets.i.posthog.com/static/:path*",
       },
+      // Remote config (/array/<token>/config.js, JSON fallback /config) from
+      // the asset CDN, as PostHog's Next.js proxy docs do. Must stay above the
+      // "/ingest/:path*" catch-all: the first matching rule wins.
+      {
+        source: "/ingest/array/:path*",
+        destination: "https://eu-assets.i.posthog.com/array/:path*",
+      },
       {
         source: "/ingest/:path*",
         destination: "https://eu.i.posthog.com/:path*",

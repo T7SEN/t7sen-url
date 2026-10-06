@@ -335,11 +335,24 @@ timeout/error, initials instead of the avatar, Geist instead of Space
 Grotesk) and the blank error image are cached only 60 s.
 
 **Analytics (PostHog, EU).** Browser client is initialized in
-`PostHogProvider`'s `useEffect` with `api_host: "/ingest"` (reverse-proxied
-by `next.config.ts` rewrites to `eu.i.posthog.com` / `eu-assets.i.posthog.com`;
-a relative `api_host` makes posthog-js send every API and asset request
-there, so the CSP needs no PostHog origin; the one exception is the PostHog
-toolbar, see landmine 6). Owner/preview traffic is tagged with the
+`PostHogProvider`'s `useEffect` with `api_host: "/ingest"`, reverse-proxied
+by three `next.config.ts` rewrites, as in PostHog's Next.js proxy docs:
+`/ingest/static/*` (lazily loaded scripts) and `/ingest/array/*` (the
+project's remote config, `config.js`) go to `eu-assets.i.posthog.com`, then
+the `/ingest/*` catch-all (events, `/flags`) to `eu.i.posthog.com`. The
+catch-all must stay last: the first matching rule wins. A relative `api_host`
+makes posthog-js send every API and asset request there, so the CSP needs no
+PostHog origin; the one exception is the PostHog toolbar, see landmine 6.
+`defaults: "2026-05-30"` (the date PostHog's own docs and app use) with
+`persistence_save_debounce_ms: 0` (why: next paragraph). Session replay,
+heatmaps and web vitals are switched on in the PostHog project settings, not
+in code, so remote config makes every view load `posthog-recorder.js`,
+`dead-clicks-autocapture.js` (heatmaps load it to plot dead clicks;
+`$dead_click` events stay off, `captureDeadClicks` is false) and
+`web-vitals-with-attribution.js`, next to `exception-autocapture.js`
+(`capture_exceptions`) and `surveys.js`, which loads even though the project
+has no surveys (`disable_surveys: true` would skip its ~34 KB compressed).
+Owner/preview traffic is tagged with the
 `$internal_or_test_user` person property (`internal_or_test_user_hostname`
 for localhost, plus `*.vercel.app` only when `NEXT_PUBLIC_VERCEL_ENV` is
 `preview` — production also answers on its `*.vercel.app` alias and those
@@ -361,7 +374,15 @@ browser event), and adds `$process_person_profile: false` (no person profiles, m
 posthog-js `identified_only`) and `$geoip_disable: true` (PostHog would
 geolocate Vercel's server). Only `short_link_clicked` carries a location
 (`country`, from `x-vercel-ip-country`) and `$referrer`; `twitch_api_called`
-has none (posthog-node never sent GeoIP either).
+has none (posthog-node never sent GeoIP either). The join needs the cookie
+written before the click's own `/go` request leaves, hence
+`persistence_save_debounce_ms: 0`: from `defaults` 2026-05-30 posthog-js
+delays storage writes by 250 ms and flushes them only on unload, which a
+`target=_blank` click never triggers. With the delay, a click that starts a
+new session after 30 min idle reaches `/go` with the old `$sesid` (dropped
+as expired, so no `$session_id`), and a first-visit click within 250 ms of
+init carries no cookie at all. The cookie's name and keys are the same at
+every `defaults` date up to 2026-08-30.
 
 Event catalog:
 
@@ -386,7 +407,8 @@ from the proxy matcher), and each feature must be enabled per project in the
 Vercel dashboard or its script 404s. Hobby limits: Web Analytics 50k
 events/month account-wide, page views only (no custom events); Speed Insights
 10k events per rolling 30 days, Real Experience Score only — per-metric Core
-Web Vitals come from Sentry tracing. Exceeding either pauses collection, not
+Web Vitals come from Sentry tracing and PostHog `$web_vitals` (switched on in
+the PostHog project settings, see Analytics). Exceeding either pauses collection, not
 the site.
 
 **Observability (Sentry).** Org `t7sen` (formerly `t7sen-c0`), project
@@ -676,6 +698,12 @@ every change with `npx tsc --noEmit`, `npm run lint`, and `npm run build`.
    root `instrumentation-client.ts` (or any second `posthog.init`): the PostHog
    wizard's commented-out copy there was deleted because enabling it
    double-initialized. `src/instrumentation-client.ts` is Sentry's browser init.
+   When bumping `defaults`, keep `persistence_save_debounce_ms: 0` (it looks
+   redundant but protects the `/go` session join, see Analytics) and read
+   what each newer date changes in `posthog-core.js` (`defaultsThatVaryByConfig`).
+   From 2026-08-29, `cookieWinsOnConflict` adds a 365-day
+   `ph_<token>_posthog_cpm` cookie on `.t7sen.com`: set it to `false` unless
+   another `*.t7sen.com` site shares this PostHog project.
 
 9. **The dev-only `console.error` patch in `theme-provider.tsx` is
    intentional.** It suppresses React 19's "Encountered a script" warning

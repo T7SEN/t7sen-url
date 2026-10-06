@@ -10,7 +10,13 @@ export function PostHogProvider({ children }: { children: React.ReactNode }) {
     posthog.init(process.env.NEXT_PUBLIC_POSTHOG_PROJECT_TOKEN!, {
       api_host: "/ingest",
       ui_host: "https://eu.posthog.com",
-      defaults: "2026-01-30",
+      // PostHog's own promoted date (its docs, onboarding and app use it)
+      defaults: "2026-05-30",
+      // 2026-05-30 delays storage writes by 250 ms, flushing only on unload.
+      // /go reads the ph_<token>_posthog cookie on the click's own request
+      // (target=_blank: no unload), so a session the click starts, or a first
+      // visit's cookie, must already be written: keep this at 0
+      persistence_save_debounce_ms: 0,
       capture_exceptions: true,
       debug: false,
       // Tag owner/preview traffic with the $internal_or_test_user person
