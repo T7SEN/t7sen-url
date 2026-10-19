@@ -50,7 +50,9 @@ export function JsonLd() {
         sameAs: [
           destinationOf(profileData.twitchUrl),
           ...profileData.socials.map((social) => destinationOf(social.url)),
-          ...profileData.links.map((link) => destinationOf(link.url)),
+          ...profileData.links
+            .filter((link) => !link.comingSoon)
+            .map((link) => destinationOf(link.url)),
         ].filter((url) => !url.startsWith("mailto:")),
       },
     ],

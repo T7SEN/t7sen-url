@@ -19,7 +19,7 @@ const REVEAL_HOLD_MS = 2800;
 
 export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
   const posthog = usePostHog();
-  const { title, url, icon: Icon, isFeatured } = link;
+  const { title, url, icon: Icon, isFeatured, comingSoon } = link;
   const cardRef = React.useRef<HTMLAnchorElement>(null);
   const [revealed, setRevealed] = React.useState(false);
 
@@ -75,19 +75,24 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
     return (
       <a
         ref={cardRef}
-        href={url}
-        target="_blank"
+        // Coming soon: without href this is a placeholder link (no link
+        // role, not focusable, nothing to click); the reveal still plays
+        href={comingSoon ? undefined : url}
+        target={comingSoon ? undefined : "_blank"}
         rel="noopener noreferrer"
-        onClick={handleClick}
+        onClick={comingSoon ? undefined : handleClick}
         data-reveal={revealed ? "" : undefined}
         className={cn(
           // CSS entrance (tw-animate-css)
           "animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700",
-          // reveal: = hover, or the one-time touch-screen reveal (globals.css).
+          // reveal: = hover, or the one-time touch-screen reveal (globals.css)
+          "group/featured relative flex w-full items-center justify-center overflow-hidden rounded-[20px] px-6 py-5 shadow-xl transition-all reveal:scale-[1.02] short:py-4",
           // active: a quick press, without the entrance's 500 ms delay;
           // important because reveal: rules come later in the CSS and would
-          // keep the hover scale while pressed
-          "group/featured relative flex w-full items-center justify-center overflow-hidden rounded-[20px] px-6 py-5 shadow-xl transition-all reveal:scale-[1.02] active:scale-[0.98]! active:delay-0 active:duration-150 short:py-4",
+          // keep the hover scale while pressed. Nothing to press when coming soon
+          comingSoon
+            ? "cursor-default select-none"
+            : "active:scale-[0.98]! active:delay-0 active:duration-150",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:focus-visible:ring-offset-zinc-950",
           "bg-white/80 border border-zinc-200/50",
           "dark:bg-[#030303] dark:border-transparent",
@@ -154,23 +159,43 @@ export const PrimaryLinkCard = ({ link }: PrimaryLinkCardProps) => {
         </div>
 
         <div className="pointer-events-none absolute inset-0 z-20 rounded-[20px] border border-black/5 transition-colors duration-700 reveal:border-[#9146FF]/50 reveal:delay-[400ms] dark:border-white/5 dark:reveal:border-[#9146FF]/50" />
+
+        {/* In the corner, so the card keeps its height; turns white over the
+            purple burst like the title. Phones: tighter to the corner and
+            leading-none, or it overlaps the centred title */}
+        {comingSoon && (
+          <span className="absolute right-2 top-2 z-30 rounded-full border border-violet-500/30 bg-white/70 px-2 py-0.5 text-[10px] font-bold uppercase leading-none tracking-[0.15em] text-violet-700 backdrop-blur-md transition-colors duration-700 reveal:border-white/40 reveal:bg-white/15 reveal:text-white reveal:delay-[400ms] sm:right-3 sm:top-3 dark:bg-black/50 dark:text-violet-300 dark:reveal:text-white">
+            Coming soon
+          </span>
+        )}
       </a>
     );
   }
 
   return (
     <a
-      href={url}
-      target="_blank"
+      // Coming soon: a placeholder link, as on the featured card
+      href={comingSoon ? undefined : url}
+      target={comingSoon ? undefined : "_blank"}
       rel="noopener noreferrer"
-      onClick={handleClick}
-      // CSS entrance (tw-animate-css)
-      className="animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700 flex w-full items-center gap-3 rounded-xl border border-zinc-200/50 bg-white/40 p-4 transition-all hover:scale-[1.02] active:scale-[0.98] active:delay-0 active:duration-150 hover:border-zinc-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:border-zinc-800/50 dark:bg-zinc-950/40 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:focus-visible:ring-offset-zinc-950"
+      onClick={comingSoon ? undefined : handleClick}
+      className={cn(
+        // CSS entrance (tw-animate-css)
+        "animate-in fade-in slide-in-from-bottom-4 fill-mode-backwards delay-500 duration-700 flex w-full items-center gap-3 rounded-xl border border-zinc-200/50 bg-white/40 p-4 transition-all dark:border-zinc-800/50 dark:bg-zinc-950/40",
+        comingSoon
+          ? "cursor-default select-none"
+          : "hover:scale-[1.02] active:scale-[0.98] active:delay-0 active:duration-150 hover:border-zinc-300 hover:bg-white hover:shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#9146FF] focus-visible:ring-offset-2 focus-visible:ring-offset-zinc-50 dark:hover:border-zinc-700 dark:hover:bg-zinc-900 dark:focus-visible:ring-offset-zinc-950",
+      )}
     >
       <Icon className="h-5 w-5 text-zinc-600 dark:text-zinc-400" />
       <span className="font-medium text-zinc-800 dark:text-zinc-200">
         {title}
       </span>
+      {comingSoon && (
+        <span className="ml-auto rounded-full border border-violet-500/30 px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.15em] text-violet-700 dark:text-violet-300">
+          Coming soon
+        </span>
+      )}
     </a>
   );
 };

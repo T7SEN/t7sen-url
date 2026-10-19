@@ -10,6 +10,9 @@ export interface ProfileLink {
   url: string;
   icon: React.ElementType;
   isFeatured?: boolean;
+  /** Shown with a "Coming soon" badge but not clickable (no link, no click
+   *  event) and left out of the JSON-LD, while the destination isn't live */
+  comingSoon?: boolean;
 }
 
 export interface ProfileConfig {
@@ -74,6 +77,8 @@ export const profileData: ProfileConfig = {
       url: goUrl("website"),
       icon: Icons.globe,
       isFeatured: true,
+      // t7sen.com is still being built (the domain has no DNS records yet)
+      comingSoon: true,
     },
   ],
 

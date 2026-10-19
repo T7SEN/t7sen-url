@@ -220,7 +220,12 @@ link (`profileData.twitchUrl`), and `twitchChannel` is defined once in
 `links.ts`. `siteUrl` there is the one canonical origin (`NEXT_PUBLIC_APP_URL`,
 falling back to production) used by metadata, JSON-LD, robots, sitemap, the
 OG domain line and the Share button. Display copy (bio, tagline, job title,
-knowsAbout, share text, OG subtitle) lives in `profile.ts`.
+knowsAbout, share text, OG subtitle) lives in `profile.ts`. A link with
+`comingSoon: true` (today: "My Site", while t7sen.com is being built) keeps
+its card and reveal but gets a "Coming soon" badge and no `href`: a
+placeholder link with no link role, no focus, no click and no
+`primary_link_clicked`, left out of the JSON-LD `sameAs`. Its `/go` slug
+still redirects. Remove the flag to make it a link again.
 
 **Twitch live status.** `StreamStatusProvider`
 (`src/components/stream-status-provider.tsx`, wrapped around the page in
